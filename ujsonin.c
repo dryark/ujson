@@ -101,7 +101,17 @@ Hash: SAFE
     let = data[pos++];
     if( let == '"' ) goto KeyName1;
     if( let == '}' && cur->parent ) cur = cur->parent;
+    if( let == '/' && pos < (len-1) ) {
+        if( data[pos] == '/' ) { pos++; goto HashComment; }
+        if( data[pos] == '*' ) { pos++; goto HashComment2; }
+    }
     goto Hash;
+HashComment: SAFEGET
+    if( let == 0x0d || let == 0x0a ) goto Hash;
+    goto HashComment;
+HashComment2: SAFEGET
+    if( let == '*' && pos < (len-1) && data[pos] == '/' ) { pos++; goto Hash; }
+    goto HashComment2;
 KeyName1: SAFE
     keyStart = &data[pos++];
 KeyNameX: SAFEGET
@@ -122,10 +132,20 @@ AfterColon: SAFEGET
         cur = (jnode *) newHash;
         goto Hash;
     }
+    if( let == '/' && pos < (len-1) ) {
+        if( data[pos] == '/' ) { pos++; goto AC_Comment; }
+        if( data[pos] == '*' ) { pos++; goto AC_Comment2; }
+    }
     // if( let == 't' || let == 'f' ) ... for true/false
     // if( let >= '0' && let <= '9' ) ... for numbers
     // if( let == '[' ) ... for array
     goto AfterColon;
+AC_Comment: SAFEGET
+    if( let == 0x0d || let == 0x0a ) goto AfterColon;
+    goto AC_Comment;
+AC_Comment2: SAFEGET
+    if( let == '*' && pos < (len-1) && data[pos] == '/' ) { pos++; goto Hash; }
+    goto AC_Comment2;
 String1: SAFEGET
     if( let == '"' ) {
        jnode *newStr = (jnode *) node_str__new( nullStr, 0 );
