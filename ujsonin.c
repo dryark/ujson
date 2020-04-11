@@ -91,10 +91,6 @@ node_hash *parse( char *data, int len, int *err ) {
     int pos = 1, keyLen;
     char *keyStart, *strStart, let;
     
-    if( data[0] != '{' ) {
-        *err = 1;
-        return NULL;
-    }
     node_hash *root = node_hash__new();
     jnode *cur = ( jnode * ) root;
 Hash: SAFE
