@@ -1,6 +1,6 @@
 // Copyright (C) 2018 David Helkowski
 
-#include "xjr-string-tree.h"
+#include "string-tree.h"
 #include<string.h>
 #include"red_black_tree.h"
 
@@ -367,10 +367,6 @@ snode *snode__new_len( char *newstr, int nstrlen, void *newdata, char dataType, 
 	self->dataType = dataType;
 	//printf("New snodec - next=%i str=%s data=%i\n", (int)next, str, (int)data );
 	return self;
-}
-
-void string_tree__dump( string_tree *self ) {
-	RBTreePrint( (rb_red_blk_tree *) self->tree );
 }
 
 xjr_arr *xjr_arr__new() {

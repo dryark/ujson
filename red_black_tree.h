@@ -1,29 +1,6 @@
 #ifndef __RED_BLACK_TREE_H
 #define __RED_BLACK_TREE_H
-#ifdef DMALLOC
-#include <dmalloc.h>
-#endif
-#include"misc.h"
-#include"stack.h"
-
-/*  CONVENTIONS:  All data structures for red-black trees have the prefix */
-/*                "rb_" to prevent name conflicts. */
-/*                                                                      */
-/*                Function names: Each word in a function name begins with */
-/*                a capital letter.  An example funcntion name is  */
-/*                CreateRedTree(a,b,c). Furthermore, each function name */
-/*                should begin with a capital letter to easily distinguish */
-/*                them from variables. */
-/*                                                                     */
-/*                Variable names: Each word in a variable name begins with */
-/*                a capital letter EXCEPT the first letter of the variable */
-/*                name.  For example, int newLongInt.  Global variables have */
-/*                names beginning with "g".  An example of a global */
-/*                variable name is gNewtonsConstant. */
-
-/* comment out the line below to remove all the debugging assertion */
-/* checks from the compiled code.  */
-#define DEBUG_ASSERT 1
+#include<stdlib.h>
 
 typedef struct rb_red_blk_node {
   void* key;
@@ -65,7 +42,6 @@ void RBTreeDestroy(rb_red_blk_tree*);
 rb_red_blk_node* TreePredecessor(rb_red_blk_tree*,rb_red_blk_node*);
 rb_red_blk_node* TreeSuccessor(rb_red_blk_tree*,rb_red_blk_node*);
 rb_red_blk_node* RBExactQuery(rb_red_blk_tree*, void*);
-stk_stack * RBEnumerate(rb_red_blk_tree* tree,void* low, void* high);
 void NullFunction(void*);
 void TreeForEach(rb_red_blk_tree *tree, void (*Func)(void*), rb_red_blk_node *x);
 void TreeForEach1p(rb_red_blk_tree *tree, void (*Func)(void*,void*), void *param, rb_red_blk_node *x);

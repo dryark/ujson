@@ -65,7 +65,6 @@ xjr_arr *string_tree__getarr( string_tree *self, char *key );
 xjr_arr *string_tree__getarr_len( string_tree *self, char *key, int keylen );
 void string_tree__store( string_tree *self, char *key, void *node, char dataType );
 void string_tree__store_len( string_tree *self, char *key, int keylen, void *node, char dataType );
-void string_tree__dump( string_tree *self );
 
 void IntDest(void *); int IntComp(const void *,const void *);
 void IntPrint(const void* a); void InfoPrint(void *); void InfoDest(void *);

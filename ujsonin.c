@@ -1,14 +1,10 @@
 #include<stdio.h>
-#include"stack.h"
-#include"misc.h"
+#include<stdint.h>
 #include"red_black_tree.h"
 #include"string-tree.h"
 
-#include"stack.c"
-#include"misc.c"
 #include"red_black_tree.c"
 #include"string-tree.c"
-#include"helpers.c"
 
 typedef struct jnode_s jnode;
 
@@ -39,6 +35,7 @@ typedef struct node_arr_s { NODEBASE
 node_hash *parse( char *data, int len, int *err );
 jnode *node_hash__get( node_hash *self, char *key, int keyLen );
 void jnode__dump( jnode *self, int depth );
+char *slurp_file( char *filename, int *outlen );
 
 int main( int argc, char *argv[] ) {
     int len;
@@ -47,6 +44,19 @@ int main( int argc, char *argv[] ) {
     node_hash *root = parse( data, len, &err );
     jnode__dump( (jnode *) root, 0 );
     return 0;
+}
+
+char *slurp_file( char *filename, int *outlen ) { 
+    char *data;
+    FILE *fh = fopen( filename, "r" );
+    fseek( fh, 0, SEEK_END );
+    long int fileLength = ftell( fh );
+    fseek( fh, 0, SEEK_SET );
+    char *input = malloc( fileLength + 1 );
+    input[ fileLength ] = 0x00;
+    fread( input, (size_t) fileLength, (size_t) 1, fh );
+    *outlen = fileLength;
+    return input;
 }
 
 node_hash *node_hash__new() {
