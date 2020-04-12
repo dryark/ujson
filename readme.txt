@@ -3,14 +3,17 @@ This "JSON" parser parses a subset of JSON.
 It parses "JSON" with the following features:
 * Double quoted string keys ( unquoted keys are not yet allowed )
 * Double quoted string values
+* Unquoted string keys
+* Single quoted string keys ( only in C )
 * Inset hashes
 * C styles comments ( both //comment and /*comment*/ )
+* Escaped double quotes within keys ( only in C )
 
 The following JSON features are not supported currently:
 * Booleans ( true/false )
 * Numbers
 * Arrays
-* Escaped double quotes within either keys or values
+* Escaped double quotes within values
 
 The following additional "features" exist:
 * Commas between things can be added or left out; they have no effect

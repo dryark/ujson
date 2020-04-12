@@ -30,6 +30,12 @@ typedef struct node_str_s { NODEBASE
     int len;
 } node_str;
 
+typedef struct node_arr_s { NODEBASE
+    jnode *head;
+    jnode *tail;
+    int count;
+} node_arr;
+
 node_hash *parse( char *data, int len, int *err );
 jnode *node_hash__get( node_hash *self, char *key, int keyLen );
 void jnode__dump( jnode *self, int depth );
@@ -58,6 +64,22 @@ node_str *node_str__new( char *str, int len ) {
     return self;
 }
 
+node_arr *node_arr__new() {
+    node_arr *self = ( node_arr * ) calloc( sizeof( node_arr ), 1 );
+    self->type = 3;
+    return self;
+}
+
+void node_arr__add( node_arr *self, jnode *el ) {
+    self->count++;
+    if( !self->head ) {
+        self->head = self->tail = el;
+        return;
+    }
+    self->tail->parent = el;
+    self->tail = el;
+}
+
 void node_hash__dump( node_hash *self, int depth ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     printf("{\n");
@@ -71,9 +93,21 @@ void node_hash__dump( node_hash *self, int depth ) {
     SPACES printf("}\n");
 }
 
+void node_arr__dump( node_arr *self, int depth ) {
+    printf("[\n");
+    jnode *cur = self->head;
+    for( int i=0;i<self->count;i++ ) {
+        SPACES jnode__dump( cur, depth+1 );
+        cur = cur->parent; // parent is being reused as next
+    }
+    depth--;
+    SPACES printf("]\n");
+}
+
 void jnode__dump( jnode *self, int depth ) {
     if( self->type == 1 ) node_hash__dump( (node_hash *) self, depth+1 );
     else if( self->type == 2 ) printf("\"%.*s\"\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
+    else if( self->type == 3 ) node_arr__dump( (node_arr *) self, depth+1 );
 }
 
 void node_hash__store( node_hash *self, char *key, int keyLen, jnode *node ) {
@@ -153,6 +187,7 @@ AfterColon: SAFEGET
         node_hash *newHash = node_hash__new();
         newHash->parent = cur;
         if( cur->type == 1 ) node_hash__store( (node_hash *) cur, keyStart, keyLen, (jnode *) newHash );
+        if( cur->type == 3 ) node_arr__add( (node_arr *) cur, (jnode *) newHash );
         cur = (jnode *) newHash;
         goto Hash;
     }
@@ -162,8 +197,27 @@ AfterColon: SAFEGET
     }
     // if( let == 't' || let == 'f' ) ... for true/false
     // if( let >= '0' && let <= '9' ) ... for numbers
-    // if( let == '[' ) ... for array
+    if( let == '[' ) {
+        node_arr *newArr = node_arr__new();
+        newArr->parent = cur;
+        if( cur->type == 1 ) node_hash__store( (node_hash *) cur, keyStart, keyLen, (jnode *) newArr );
+        if( cur->type == 3 ) node_arr__add( (node_arr *) cur, (jnode *) newArr );
+        cur = (jnode *) newArr;
+        goto AfterColon;
+    }
+    if( let == ']' ) {
+        cur = cur->parent;
+        if( cur->type == 3 ) goto AfterColon;
+        if( cur->type == 1 ) goto Hash;
+        // should never reach here
+    }
     goto AfterColon;
+Arr: SAFEGET
+    // TODO: stack of array tails
+    if( let == ']' ) {
+        goto AfterVal;
+    }
+    goto Arr;
 AC_Comment: SAFEGET
     if( let == 0x0d || let == 0x0a ) goto AfterColon;
     goto AC_Comment;
@@ -173,8 +227,15 @@ AC_Comment2: SAFEGET
 String1: SAFEGET
     if( let == '"' ) {
        jnode *newStr = (jnode *) node_str__new( nullStr, 0 );
-       node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
-       goto AfterVal;
+       if( cur->type == 1 ) {
+           node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
+           goto AfterVal;
+       }
+       if( cur->type == 3 ) {
+           node_arr__add( (node_arr *) cur, newStr );
+           goto AfterColon;
+       }
+       goto AfterVal; // Should never be reached
     }
     strStart = &data[pos-1];
 StringX: SAFEGET
@@ -183,8 +244,14 @@ StringX: SAFEGET
        if( cur->type == 1 ) {
            jnode *newStr = (jnode *) node_str__new( strStart, strLen );
            node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
+           goto AfterVal;
        }
-       goto AfterVal;
+       if( cur->type == 3 ) {
+           jnode *newStr = (jnode *) node_str__new( strStart, strLen );
+           node_arr__add( (node_arr *) cur, newStr );
+           goto AfterColon;
+       }
+       goto AfterVal; // should never be reached
     }
     goto StringX;   
 AfterVal: SAFE
