@@ -8,11 +8,11 @@ It parses "JSON" with the following features:
 * Inset hashes
 * C styles comments ( both //comment and /*comment*/ )
 * Escaped double quotes within keys ( only in C )
+* Arrays
 
 The following JSON features are not supported currently:
 * Booleans ( true/false )
 * Numbers
-* Arrays
 * Escaped double quotes within values
 
 The following additional "features" exist:

@@ -23,6 +23,21 @@ func NewNodeHash() ( map [ string ] *JNode ) {
     return make( map [ string ] *JNode )
 }
 
+func NewNodeArr() ( *JNode ) {
+    return &JNode{ nodeType: 3, hash: NewNodeHash() }
+}
+
+func NodeArrAdd( self *JNode, el *JNode ) {
+    last := self.parent // parent serves as last till the array is done
+    if last == nil {
+        self.parent = el
+        self.hash["first"] = el
+        return
+    }
+    last.parent = el
+    self.parent = el
+}
+
 func DumpNodeHash( self *JNode, depth int ) {
     fmt.Printf("{\n")
     
@@ -34,11 +49,26 @@ func DumpNodeHash( self *JNode, depth int ) {
     fmt.Printf("%s}\n",strings.Repeat("  ",depth))
 }
 
+func DumpNodeArr( self *JNode, depth int ) {
+    fmt.Printf("[\n")
+    
+    cur := self.parent
+    for cur != nil {
+        fmt.Printf(strings.Repeat("  ",depth));
+        DumpJNode( cur, depth );
+        cur = cur.parent
+    }
+    depth--;
+    fmt.Printf("%s]\n",strings.Repeat("  ",depth))
+}
+
 func DumpJNode( self *JNode, depth int ) {
     if self.nodeType == 1 {
         DumpNodeHash( self, depth+1 )
     } else if self.nodeType == 2 {
         fmt.Printf("\"%s\"\n", *self.str )
+    } else if self.nodeType == 3 {
+        DumpNodeArr( self, depth+1 )
     }
 }
 
@@ -135,6 +165,9 @@ AfterColon:
         if cur.nodeType == 1 {
             cur.hash[ key ] = newJNode
         }
+        if cur.nodeType == 3 {
+            NodeArrAdd( cur, newJNode )
+        }
         cur = newJNode
         goto Hash
     }
@@ -150,7 +183,26 @@ AfterColon:
     }
     // if( let == 't' || let == 'f' ) ... for true/false
     // if( let >= '0' && let <= '9' ) ... for numbers
-    // if( let == '[' ) ... for array
+    if let == '[' {
+        newArr := NewNodeArr()
+        newArr.hash["parent"] = cur
+        if cur.nodeType == 1 {
+            cur.hash[ key ] = newArr
+        }
+        if cur.nodeType == 3 {
+            NodeArrAdd( cur, newArr )
+        }
+        cur = newArr;
+        goto AfterColon;
+    }
+    if let == ']' {
+        oldCur := cur
+        cur = cur.hash["parent"]
+        oldCur.parent = oldCur.hash["first"]
+        if cur.nodeType == 3 { goto AfterColon }
+        if cur.nodeType == 1 { goto Hash }
+        // should never reach here
+    }    
     goto AfterColon;
 AC_Comment:
     let = data[pos]
@@ -173,20 +225,32 @@ String1:
     if( let == '"' ) {
        empty := ""
        newJNode := &JNode{ nodeType: 2, str: &empty } 
-       cur.hash[ key ] = newJNode
-       goto AfterVal;
+       if cur.nodeType == 1 {
+           cur.hash[ key ] = newJNode
+           goto AfterVal
+       }
+       if cur.nodeType == 3 {
+           NodeArrAdd( cur, newJNode )
+           goto AfterColon
+       }
+       goto AfterVal // should be unreachable
     }
     strStart = pos - 1
 StringX:
     let = data[pos]
     pos++
     if let == '"' {
+       str := string( data[ strStart : pos - 1 ] )
+       newJNode := &JNode{ nodeType: 2, str: &str }
        if cur.nodeType == 1 {
-           str := string( data[ strStart : pos - 1 ] )
-           newJNode := &JNode{ nodeType: 2, str: &str }
            cur.hash[ key ] = newJNode
+           goto AfterVal
        }
-       goto AfterVal
+       if cur.nodeType == 3 {
+           NodeArrAdd( cur, newJNode )
+           goto AfterColon
+       }
+       goto AfterVal // should be unreachable
     }
     goto StringX;   
 AfterVal:
