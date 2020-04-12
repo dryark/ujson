@@ -95,7 +95,9 @@ node_hash *parse( char *data, int len, int *err ) {
     jnode *cur = ( jnode * ) root;
 Hash: SAFE
     let = data[pos++];
-    if( let == '"' ) goto KeyName1;
+    if( let == '"' ) goto QQKeyName1;
+    if( let == '\'' ) goto QKeyName1;
+    if( let >= 'a' && let <= 'z' ) { pos--; goto KeyName1; }
     if( let == '}' && cur->parent ) cur = cur->parent;
     if( let == '/' && pos < (len-1) ) {
         if( data[pos] == '/' ) { pos++; goto HashComment; }
@@ -108,10 +110,36 @@ HashComment: SAFEGET
 HashComment2: SAFEGET
     if( let == '*' && pos < (len-1) && data[pos] == '/' ) { pos++; goto Hash; }
     goto HashComment2;
+QQKeyName1: SAFE
+    let = data[pos];
+    keyStart = &data[pos++];
+    if( let == '\\' ) pos++;
+QQKeyNameX: SAFEGET
+    if( let == '\\' ) { pos++; goto QQKeyNameX; }
+    if( let == '"' ) {
+        keyLen = &data[pos-1] - keyStart;
+        goto Colon;
+    }
+    goto QQKeyNameX;
+QKeyName1: SAFE
+    let = data[pos];
+    keyStart = &data[pos++];
+    if( let == '\\' ) pos++;
+QKeyNameX: SAFEGET
+    if( let == '\\' ) { pos++; goto QKeyNameX; }
+    if( let == '\'' ) {
+        keyLen = &data[pos-1] - keyStart;
+        goto Colon;
+    }
+    goto QKeyNameX;
 KeyName1: SAFE
     keyStart = &data[pos++];
 KeyNameX: SAFEGET
-    if( let == '"' ) {
+    if( let == ':' ) {
+        keyLen = &data[pos-1] - keyStart;
+        goto AfterColon;
+    }
+    if( let == ' ' || let == '\t' ) {
         keyLen = &data[pos-1] - keyStart;
         goto Colon;
     }
