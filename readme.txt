@@ -9,11 +9,13 @@ It parses "JSON" with the following features:
 * C styles comments ( both //comment and /*comment*/ )
 * Escaped double quotes within keys ( only in C )
 * Arrays
+* N-digit positive and negative integers
 
 The following JSON features are not supported currently:
 * Booleans ( true/false )
-* Numbers
+* Numbers with . or exponents
 * Escaped double quotes within values
+* null
 
 The following additional "features" exist:
 * Commas between things can be added or left out; they have no effect
@@ -23,6 +25,8 @@ The following additional "features" exist:
 * Null characters have no special meaning to the parser and are ignored.
 * String values can contain carriage returns
 * Key "case" does matter
+* When dumping "JSON", quotes are left off "basic keys" ( keys starting with a letter
+  and containing only alphanumerics ) - for Golang only currently
 
 Known bugs / deficiencies:
 * There is no json__delete yet to clean up a parsed structure when no longer needed
@@ -41,3 +45,43 @@ Known bugs / deficiencies:
 * JSON longer than 'int' size ( of your compiler ) isn't currently supported. If you
   are running on a 16-bit platform, this means 32k limit to JSON on those platforms.
   It depends on both your platform and your compiler really.
+  
+Proposols:
+* Extensions
+  Example format:
+  {
+    hexdata: x.[hex chars]
+    flags: bin.1011
+    bindata: b64.[base 64 chars],
+    heredoc: hd.<<d undent
+        fdfsfd
+    d
+    data: cdata.
+[[ 
+    ]],
+    raw: raw.len=10.[10 bytes of raw data],
+    file: include.file="./somefile",
+    mydate: date.2011/12/17,
+    mydt: dt.2011/12/13 14:45.1532 PT,
+  }
+  Method of implementation:
+    Use an extension API to register 'b64' as a new data type. A handler is called
+    with the buffer and position once that point is reached, and the extension is
+    responsible for parsing the data into a structure.
+    
+    The extension also needs to register the structures it uses, and accept a numerical
+    type assigned to those structures.
+    
+    The extension is responsible for serialization of that type as well when it is
+    encountered.
+    
+    Extensions should register themselves to obtain a namespace. Without such registration
+    the file would have to be annotated as well with and identifier of what extension is
+    intended to be used by the various extensions.
+    
+    If multiple extensions are capable of handling the same "format specification" then
+    they will be allowed to share the same namespace and the users able to choose which
+    extension they want to use for that format.
+    
+    For file include, the included file should have a whitelisting of the file(s) it can be included into,
+    to prevent the parser from being used to gain access to files it should not have access to.

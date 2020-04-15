@@ -66,9 +66,9 @@ node_hash *node_hash__new() {
     return self;
 }
 
-node_str *node_str__new( char *str, int len ) {
+node_str *node_str__new( char *str, int len, char type ) {
     node_str *self = ( node_str * ) calloc( sizeof( node_str ), 1 );
-    self->type = 2;
+    self->type = type; // 2 is str, 4 is number, 5 is a negative number
     self->str = str;
     self->len = len;
     return self;
@@ -118,6 +118,8 @@ void jnode__dump( jnode *self, int depth ) {
     if( self->type == 1 ) node_hash__dump( (node_hash *) self, depth+1 );
     else if( self->type == 2 ) printf("\"%.*s\"\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
     else if( self->type == 3 ) node_arr__dump( (node_arr *) self, depth+1 );
+    else if( self->type == 4 ) printf("%.*s\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
+    else if( self->type == 5 ) printf("-%.*s\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
 }
 
 void node_hash__store( node_hash *self, char *key, int keyLen, jnode *node ) {
@@ -133,6 +135,7 @@ char nullStr[2] = { 0, 0 };
 
 node_hash *parse( char *data, int len, int *err ) {
     int pos = 1, keyLen;
+    uint8_t neg = 0;
     char *keyStart, *strStart, let;
     
     node_hash *root = node_hash__new();
@@ -206,7 +209,8 @@ AfterColon: SAFEGET
         if( data[pos] == '*' ) { pos++; goto AC_Comment2; }
     }
     // if( let == 't' || let == 'f' ) ... for true/false
-    // if( let >= '0' && let <= '9' ) ... for numbers
+    if( let >= '0' && let <= '9' ) { neg=0; goto Number1; }
+    if( let == '-' ) { neg=1; pos++; goto Number1; }
     if( let == '[' ) {
         node_arr *newArr = node_arr__new();
         newArr->parent = cur;
@@ -234,30 +238,47 @@ AC_Comment: SAFEGET
 AC_Comment2: SAFEGET
     if( let == '*' && pos < (len-1) && data[pos] == '/' ) { pos++; goto Hash; }
     goto AC_Comment2;
+Number1: SAFE
+    strStart = &data[pos-1];
+NumberX: SAFEGET
+    //if( let == '.' ) goto AfterDot;
+    if( let < '0' || let > '9' ) {
+        int strLen = &data[pos-1] - strStart;
+        jnode *newStr = (jnode *) node_str__new( strStart, strLen, neg ? 5 : 4 );
+        if( cur->type == 1 ) {
+            node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
+            goto AfterVal;
+        }
+        if( cur->type == 3 ) {
+            node_arr__add( (node_arr *) cur, newStr );
+            goto AfterColon;
+        }
+    }
+    goto NumberX;
+//AfterDot: SAFEGET
 String1: SAFEGET
     if( let == '"' ) {
-       jnode *newStr = (jnode *) node_str__new( nullStr, 0 );
-       if( cur->type == 1 ) {
-           node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
-           goto AfterVal;
-       }
-       if( cur->type == 3 ) {
-           node_arr__add( (node_arr *) cur, newStr );
-           goto AfterColon;
-       }
-       goto AfterVal; // Should never be reached
+        jnode *newStr = (jnode *) node_str__new( nullStr, 0, 2 );
+        if( cur->type == 1 ) {
+            node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
+            goto AfterVal;
+        }
+        if( cur->type == 3 ) {
+            node_arr__add( (node_arr *) cur, newStr );
+            goto AfterColon;
+        }
+        goto AfterVal; // Should never be reached
     }
     strStart = &data[pos-1];
 StringX: SAFEGET
     if( let == '"' ) {
        int strLen = &data[pos-1] - strStart;
+       jnode *newStr = (jnode *) node_str__new( strStart, strLen, 2 );
        if( cur->type == 1 ) {
-           jnode *newStr = (jnode *) node_str__new( strStart, strLen );
            node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
            goto AfterVal;
        }
        if( cur->type == 3 ) {
-           jnode *newStr = (jnode *) node_str__new( strStart, strLen );
            node_arr__add( (node_arr *) cur, newStr );
            goto AfterColon;
        }
