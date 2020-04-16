@@ -36,9 +36,11 @@ node_hash *parse( char *data, int len, int *err );
 jnode *node_hash__get( node_hash *self, char *key, int keyLen );
 void jnode__dump( jnode *self, int depth );
 char *slurp_file( char *filename, int *outlen );
+void ujsonin_init();
 
 int main( int argc, char *argv[] ) {
     int len;
+    ujsonin_init();
     char *data = slurp_file( "test.json", &len );
     int err;
     node_hash *root = parse( data, len, &err );
@@ -57,6 +59,12 @@ char *slurp_file( char *filename, int *outlen ) {
     fread( input, (size_t) fileLength, (size_t) 1, fh );
     *outlen = fileLength;
     return input;
+}
+
+jnode *jnode__new( int type ) {
+    jnode *self = ( jnode * ) calloc( sizeof( jnode ), 1 );
+    self->type = type;
+    return self;
 }
 
 node_hash *node_hash__new() {
@@ -119,7 +127,10 @@ void jnode__dump( jnode *self, int depth ) {
     else if( self->type == 2 ) printf("\"%.*s\"\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
     else if( self->type == 3 ) node_arr__dump( (node_arr *) self, depth+1 );
     else if( self->type == 4 ) printf("%.*s\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
-    else if( self->type == 5 ) printf("-%.*s\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
+    else if( self->type == 5 ) printf("-%.*s\n", ( (node_str *) self )->len, ( (node_str *) self )->str );  
+    else if( self->type == 6 ) printf("true\n");
+    else if( self->type == 7 ) printf("false\n");
+    else if( self->type == 8 ) printf("false\n");
 }
 
 void node_hash__store( node_hash *self, char *key, int keyLen, jnode *node ) {
@@ -133,8 +144,49 @@ jnode *node_hash__get( node_hash *self, char *key, int keyLen ) {
 
 char nullStr[2] = { 0, 0 };
 
+typedef struct handle_res_s {
+    int dest;
+    jnode *node;
+} handle_res;
+
+handle_res *handle_res__new() {
+    handle_res *self = ( handle_res * ) calloc( sizeof( handle_res ), 1 );
+    return self;
+}
+
+handle_res *handle_true( char *data, int *pos ) {
+    jnode *node = jnode__new( 6 );
+    handle_res *res = handle_res__new();
+    res->node = node;
+    return res;
+}
+
+handle_res *handle_false( char *data, int *pos ) {
+    jnode *node = jnode__new( 7 );
+    handle_res *res = handle_res__new();
+    res->node = node;
+    return res;
+}
+
+handle_res *handle_null( char *data, int *pos ) {
+    jnode *node = jnode__new( 8 );
+    handle_res *res = handle_res__new();
+    res->node = node;
+    return res;
+}
+
+typedef handle_res* (*ahandler)(char *, int * ); 
+
+string_tree *handlers;
+void ujsonin_init() {
+    handlers = string_tree__new();
+    string_tree__store_len( handlers, "true", 4, (void *) &handle_true, 0 );
+    string_tree__store_len( handlers, "false", 5, (void *) &handle_false, 0 );
+    string_tree__store_len( handlers, "null", 4, (void *) &handle_null, 0 );
+}
+
 node_hash *parse( char *data, int len, int *err ) {
-    int pos = 1, keyLen;
+    int pos = 1, keyLen, typeStart;
     uint8_t neg = 0;
     char *keyStart, *strStart, let;
     
@@ -204,6 +256,10 @@ AfterColon: SAFEGET
         cur = (jnode *) newHash;
         goto Hash;
     }
+    if( let >= 'a' && let <= 'z' ) {
+        typeStart = pos - 1;
+        goto TypeX;
+    }
     if( let == '/' && pos < (len-1) ) {
         if( data[pos] == '/' ) { pos++; goto AC_Comment; }
         if( data[pos] == '*' ) { pos++; goto AC_Comment2; }
@@ -226,6 +282,40 @@ AfterColon: SAFEGET
         // should never reach here
     }
     goto AfterColon;
+TypeX: SAFEGET
+    if( ( let >= '0' && let <= 9 ) || ( let >= 'a' && let <= 'z' ) ) goto TypeX;
+    pos--; // go back a character; we've encountered a non-type character
+    // Type name is done
+    int typeLen = pos - typeStart; 
+    // do something with the type
+    char htype;
+    ahandler handler = (ahandler) string_tree__get_len( handlers, &data[ typeStart ], typeLen, &htype );
+    if( handler == NULL ) {
+        printf("disaster");
+        exit(1);
+    }
+    handle_res *res = (*handler)( data, &pos );
+    if( res == NULL ) {
+        printf("disaster");
+        exit(1);
+    }
+    if( res->dest == 0 ) {
+        if( cur->type == 1 ) {
+            node_hash__store( (node_hash *) cur, keyStart, keyLen, res->node );
+            goto AfterVal;
+        }
+        if( cur->type == 3 ) {
+            node_arr__add( (node_arr *) cur, res->node );
+            goto AfterColon;
+        }
+    }
+    goto TypeX; // should never reach here
+/*AfterType: SAFEGET
+    if( let == '.' ) goto GotDot;
+    // skip whitespace till .
+    if( let == ' ' || let == 0x0d || let == 0x0a || let == '\t' ) goto AfterType;
+    // something else. garbage. :(
+    goto AfterType;*/
 Arr: SAFEGET
     // TODO: stack of array tails
     if( let == ']' ) {
