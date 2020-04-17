@@ -37,15 +37,123 @@ jnode *node_hash__get( node_hash *self, char *key, int keyLen );
 void jnode__dump( jnode *self, int depth );
 char *slurp_file( char *filename, int *outlen );
 void ujsonin_init();
+void jnode__dump_env( jnode *self );
+void node_hash__dump_to_makefile( node_hash *self, char *prefix );
+
+node_hash *parse_with_default( char *file, char *def, char **d1, char **d2 ) {
+    int flen;
+    char *fdata = slurp_file( (char *) file, &flen );
+    if( !fdata ) {
+        printf("Could not open file '%s'\n", file );
+        exit(1);
+    }
+    int ferr;
+    node_hash *froot = parse( fdata, flen, &ferr );
+    int dlen;
+    char *ddata = NULL;
+    int derr;
+    
+    node_hash *both;
+    if( def ) {
+        ddata = slurp_file( (char *) def, &dlen );
+        node_hash *droot = parse( ddata, dlen, &derr );
+    }
+    else {
+        both = froot;
+    }
+    *d1 = fdata;
+    if( ddata ) *d2 = ddata;
+    return both;
+}
 
 int main( int argc, char *argv[] ) {
-    int len;
     ujsonin_init();
-    char *data = slurp_file( "test.json", &len );
-    int err;
-    node_hash *root = parse( data, len, &err );
-    jnode__dump( (jnode *) root, 0 );
-    return 0;
+    
+    if( argc == 1 ) {
+        printf("Usage");
+        exit(0);
+    }
+    string_tree *args = string_tree__new();
+    char *cmd = argv[1];
+    for( int i=2;i<argc;i++ ) {
+        char *key = argv[i];
+        if( key[0] == '-' ) {
+            key++;
+            char *val = argv[++i];
+            char extra = 0;
+            char *vals[7] = {0,0,0,0,0,0,0};
+            for( int j=i+1;j<argc;j++ ) {
+                char *another = argv[j];
+                if( another[0] == '-' ) break;
+                extra++;
+                vals[extra] = another;
+            }
+            if( extra ) {
+                vals[0] = val;
+                string_tree__store_len( args, key, strlen( key ), (void *) vals, 2 );
+                i += extra;
+            }
+            else {
+                string_tree__store_len( args, key, strlen( key ), (void *) val, 1 );
+            }
+        }
+    }
+    
+    char type;
+    if( !strncmp(cmd,"makefile",8) ) {
+        char *file = string_tree__get_len( args, "file", 4, &type );
+        char *defaults = string_tree__get_len( args, "defaults", 8, &type );
+        char *prefix1 = string_tree__get_len( args, "prefix", 6, &type );
+        
+        char prefix[100];
+        if( prefix1 ) sprintf(prefix,"%s_",prefix1);
+        char *d1, *d2;
+        node_hash__dump_to_makefile( parse_with_default(file,defaults, &d1, &d2 ), prefix1 ? prefix : 0 );
+        exit(0);
+    }
+    if( !strncmp(cmd,"get",3) ) {
+        char *file = string_tree__get_len( args, "file", 4, &type );
+        if( !file ) {
+            fprintf(stderr,"-file must be specified\n");
+            exit(1);
+        }
+        char *defaults = string_tree__get_len( args, "defaults", 8, &type );
+        char *d1,*d2;
+        jnode *cur = (jnode *) parse_with_default( file, defaults, &d1, &d2 );
+        
+        void *pathV = string_tree__get_len( args, "path", 4, &type );
+        if( !pathV ) {
+            fprintf(stderr,"-path must be specified\n");
+            exit(1);
+        }
+        char *onepart[2] = {0,0};
+        char **parts;
+        if( type == 1 ) {
+            onepart[0] = (char *) pathV;
+            parts = onepart;
+        }
+        if( type == 2 ) parts = ( char ** ) pathV;
+        
+        for( int i=0;i<6;i++ ) {
+            char *part = parts[i];
+            if( !part ) break;
+            node_hash *curhash = ( node_hash * ) cur;
+            cur = node_hash__get( curhash, part, strlen( part ) );
+        }
+        jnode__dump_env( cur );
+        exit(0);
+    }
+    if( !strncmp(cmd,"test",4) ) {
+        int len;
+        char *data = slurp_file( "test.json", &len );
+        int err;
+        node_hash *root = parse( data, len, &err );
+        jnode__dump( (jnode *) root, 0 );
+    
+        exit(0);   
+    }
+    fprintf(stderr,"Unknown command '%s'\n", cmd );
+    return 1;
 }
 
 char *slurp_file( char *filename, int *outlen ) { 
@@ -111,6 +219,24 @@ void node_hash__dump( node_hash *self, int depth ) {
     SPACES printf("}\n");
 }
 
+void jnode__dump_to_makefile( jnode *self, char *prefix );
+void node_hash__dump_to_makefile( node_hash *self, char *prefix ) {
+    xjr_key_arr *keys = string_tree__getkeys( self->tree );
+    char pref2[ 100 ];
+    for( int i=0;i<keys->count;i++ ) {
+        char *key = keys->items[i];
+        int len = keys->sizes[i];
+        jnode *val = node_hash__get( self, key, len );
+        if( val->type != 1 ) printf("%s%.*s := ",prefix?prefix:"",len,key);
+        else {
+            if( prefix ) sprintf( pref2, "%s%.*s_", prefix, len, key );
+            else sprintf( pref2, "%.*s", prefix, len, key );
+            prefix = pref2;
+        }
+        jnode__dump_to_makefile( val, prefix );
+    }
+}
+
 void node_arr__dump( node_arr *self, int depth ) {
     printf("[\n");
     jnode *cur = self->head;
@@ -131,6 +257,32 @@ void jnode__dump( jnode *self, int depth ) {
     else if( self->type == 6 ) printf("true\n");
     else if( self->type == 7 ) printf("false\n");
     else if( self->type == 8 ) printf("false\n");
+}
+
+void jnode__dump_to_makefile( jnode *self, char *prefix ) {
+    if( self->type == 1 ) node_hash__dump_to_makefile( (node_hash *) self, prefix );
+    else {
+        printf("\"");
+        if( self->type == 2 ) printf("%.*s", ( (node_str *) self )->len, ( (node_str *) self )->str );
+        //else if( self->type == 3 ) node_arr__dump_to_makefile( (node_arr *) self, 0 );
+        else if( self->type == 4 ) printf("%.*s", ( (node_str *) self )->len, ( (node_str *) self )->str );
+        else if( self->type == 5 ) printf("-%.*s", ( (node_str *) self )->len, ( (node_str *) self )->str );  
+        else if( self->type == 6 ) printf("true");
+        else if( self->type == 7 ) printf("false");
+        else if( self->type == 8 ) printf("false");
+        printf("\"\n");
+    }
+}
+
+void jnode__dump_env( jnode *self ) {
+    printf("\"");
+    if( self->type == 2 ) printf("%.*s", ( (node_str *) self )->len, ( (node_str *) self )->str );
+    else if( self->type == 4 ) printf("%.*s", ( (node_str *) self )->len, ( (node_str *) self )->str );
+    else if( self->type == 5 ) printf("-%.*s", ( (node_str *) self )->len, ( (node_str *) self )->str );  
+    else if( self->type == 6 ) printf("true");
+    else if( self->type == 7 ) printf("false");
+    else if( self->type == 8 ) printf("false");
+    printf("\"");
 }
 
 void node_hash__store( node_hash *self, char *key, int keyLen, jnode *node ) {
