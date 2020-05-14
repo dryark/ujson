@@ -11,8 +11,8 @@ typedef struct jnode_s jnode;
 #define NODEBASE char type; jnode *parent;
 // type 1=hash, 2=str
 
-#define SAFE if(pos>=len) goto Done;
-#define SAFEGET if(pos>=len) goto Done; let=data[pos++];
+#define SAFE(x) if(pos>=len) { endstate=x; goto Done; }
+#define SAFEGET(x) if(pos>=len) { endstate=x; goto Done; } let=data[pos++];
 #define SPACES for( int j=0;j<depth;j++ ) printf("  ");
 
 struct jnode_s { NODEBASE };
@@ -32,13 +32,18 @@ typedef struct node_arr_s { NODEBASE
     int count;
 } node_arr;
 
-node_hash *parse( char *data, int len, int *err );
+typedef struct parser_state_s {
+    int state;
+} parser_state;
+
+node_hash *parse( char *data, int len, parser_state *beginState, int *err );
 jnode *node_hash__get( node_hash *self, char *key, int keyLen );
 void jnode__dump( jnode *self, int depth );
 char *slurp_file( char *filename, int *outlen );
 void ujsonin_init();
 void jnode__dump_env( jnode *self );
 void node_hash__dump_to_makefile( node_hash *self, char *prefix );
+void node_hash__del( node_hash *self );
 
 node_hash *parse_with_default( char *file, char *def, char **d1, char **d2 ) {
     int flen;
@@ -48,7 +53,7 @@ node_hash *parse_with_default( char *file, char *def, char **d1, char **d2 ) {
         exit(1);
     }
     int ferr;
-    node_hash *froot = parse( fdata, flen, &ferr );
+    node_hash *froot = parse( fdata, flen, NULL, &ferr );
     int dlen;
     char *ddata = NULL;
     int derr;
@@ -56,7 +61,7 @@ node_hash *parse_with_default( char *file, char *def, char **d1, char **d2 ) {
     node_hash *both;
     if( def ) {
         ddata = slurp_file( (char *) def, &dlen );
-        node_hash *droot = parse( ddata, dlen, &derr );
+        node_hash *droot = parse( ddata, dlen, NULL, &derr );
     }
     else {
         both = froot;
@@ -147,9 +152,9 @@ int main( int argc, char *argv[] ) {
         int len;
         char *data = slurp_file( "test.json", &len );
         int err;
-        node_hash *root = parse( data, len, &err );
+        node_hash *root = parse( data, len, NULL, &err );
         jnode__dump( (jnode *) root, 0 );
-    
+        node_hash__del( root );
         exit(0);   
     }
     fprintf(stderr,"Unknown command '%s'\n", cmd );
@@ -217,6 +222,18 @@ void node_hash__dump( node_hash *self, int depth ) {
     }
     depth--;
     SPACES printf("}\n");
+}
+
+void node_hash__del( node_hash *self ) {
+    xjr_key_arr *keys = string_tree__getkeys( self->tree );
+    for( int i=0;i<keys->count;i++ ) {
+        char *key = keys->items[i];
+        int len = keys->sizes[i];
+        jnode *sub = node_hash__get( self, key, len );
+        if( sub->type == 1 ) node_hash__del( sub );
+        else free( sub );
+    }
+    free( self );
 }
 
 void jnode__dump_to_makefile( jnode *self, char *prefix );
@@ -337,14 +354,43 @@ void ujsonin_init() {
     string_tree__store_len( handlers, "null", 4, (void *) &handle_null, 0 );
 }
 
-node_hash *parse( char *data, int len, int *err ) {
+node_hash *parse( char *data, int len, parser_state *beginState, int *err ) {
     int pos = 1, keyLen, typeStart;
+    int endstate = 0;
     uint8_t neg = 0;
     char *keyStart, *strStart, let;
     
     node_hash *root = node_hash__new();
     jnode *cur = ( jnode * ) root;
-Hash: SAFE
+    if( beginState ) {
+        // If we start in the middle of a key or value, we must merge the previous value
+        // This means we cannot start in the normal state; we must start in one capable of handling
+        // the merge. The merge state needs to be able to handle that situation repeatedly also
+        // in order to handle long values.
+        switch( beginState->state ) {
+            case 1: goto HashComment; // contents of a comment are discard
+            case 2: goto HashComment2; // does matter as ending could be split between * and /
+            case 3: goto QQKeyName1; 
+            case 4: goto QQKeyNameX; // double quoted key
+            case 5: goto QKeyName1; 
+            case 6: goto QKeyNameX; // single quoted key
+            case 7: goto KeyName1; 
+            case 8: goto KeyNameX; // unquoted key
+            case 9: goto Colon;
+            case 10: goto AfterColon;
+            case 11: goto TypeX; // capture of a named type ( true/false included )
+            case 12: goto Arr;
+            case 13: goto AC_Comment; // comments after : and before value
+            case 14: goto AC_Comment2;
+            case 15: goto Number1;
+            case 16: goto NumberX;
+            case 17: goto String1;
+            case 18: goto StringX;
+            case 19: goto AfterVal;
+        }
+    }
+    
+Hash: SAFE(0)
     let = data[pos++];
     if( let == '"' ) goto QQKeyName1;
     if( let == '\'' ) goto QKeyName1;
@@ -355,37 +401,37 @@ Hash: SAFE
         if( data[pos] == '*' ) { pos++; goto HashComment2; }
     }
     goto Hash;
-HashComment: SAFEGET
+HashComment: SAFEGET(1)
     if( let == 0x0d || let == 0x0a ) goto Hash;
     goto HashComment;
-HashComment2: SAFEGET
+HashComment2: SAFEGET(2)
     if( let == '*' && pos < (len-1) && data[pos] == '/' ) { pos++; goto Hash; }
     goto HashComment2;
-QQKeyName1: SAFE
+QQKeyName1: SAFE(3)
     let = data[pos];
     keyStart = &data[pos++];
     if( let == '\\' ) pos++;
-QQKeyNameX: SAFEGET
+QQKeyNameX: SAFEGET(4)
     if( let == '\\' ) { pos++; goto QQKeyNameX; }
     if( let == '"' ) {
         keyLen = &data[pos-1] - keyStart;
         goto Colon;
     }
     goto QQKeyNameX;
-QKeyName1: SAFE
+QKeyName1: SAFE(5)
     let = data[pos];
     keyStart = &data[pos++];
     if( let == '\\' ) pos++;
-QKeyNameX: SAFEGET
+QKeyNameX: SAFEGET(6)
     if( let == '\\' ) { pos++; goto QKeyNameX; }
     if( let == '\'' ) {
         keyLen = &data[pos-1] - keyStart;
         goto Colon;
     }
     goto QKeyNameX;
-KeyName1: SAFE
+KeyName1: SAFE(7)
     keyStart = &data[pos++];
-KeyNameX: SAFEGET
+KeyNameX: SAFEGET(8)
     if( let == ':' ) {
         keyLen = &data[pos-1] - keyStart;
         goto AfterColon;
@@ -395,10 +441,10 @@ KeyNameX: SAFEGET
         goto Colon;
     }
     goto KeyNameX;
-Colon: SAFEGET
+Colon: SAFEGET(9)
     if( let == ':' ) goto AfterColon;
     goto Colon;
-AfterColon: SAFEGET
+AfterColon: SAFEGET(10)
     if( let == '"' ) goto String1;
     if( let == '{' ) {
         node_hash *newHash = node_hash__new();
@@ -434,7 +480,7 @@ AfterColon: SAFEGET
         // should never reach here
     }
     goto AfterColon;
-TypeX: SAFEGET
+TypeX: SAFEGET(11)
     if( ( let >= '0' && let <= 9 ) || ( let >= 'a' && let <= 'z' ) ) goto TypeX;
     pos--; // go back a character; we've encountered a non-type character
     // Type name is done
@@ -468,21 +514,21 @@ TypeX: SAFEGET
     if( let == ' ' || let == 0x0d || let == 0x0a || let == '\t' ) goto AfterType;
     // something else. garbage. :(
     goto AfterType;*/
-Arr: SAFEGET
+Arr: SAFEGET(12)
     // TODO: stack of array tails
     if( let == ']' ) {
         goto AfterVal;
     }
     goto Arr;
-AC_Comment: SAFEGET
+AC_Comment: SAFEGET(13)
     if( let == 0x0d || let == 0x0a ) goto AfterColon;
     goto AC_Comment;
-AC_Comment2: SAFEGET
+AC_Comment2: SAFEGET(14)
     if( let == '*' && pos < (len-1) && data[pos] == '/' ) { pos++; goto Hash; }
     goto AC_Comment2;
-Number1: SAFE
+Number1: SAFE(15)
     strStart = &data[pos-1];
-NumberX: SAFEGET
+NumberX: SAFEGET(16)
     //if( let == '.' ) goto AfterDot;
     if( let < '0' || let > '9' ) {
         int strLen = &data[pos-1] - strStart;
@@ -498,7 +544,7 @@ NumberX: SAFEGET
     }
     goto NumberX;
 //AfterDot: SAFEGET
-String1: SAFEGET
+String1: SAFEGET(17)
     if( let == '"' ) {
         jnode *newStr = (jnode *) node_str__new( nullStr, 0, 2 );
         if( cur->type == 1 ) {
@@ -512,7 +558,7 @@ String1: SAFEGET
         goto AfterVal; // Should never be reached
     }
     strStart = &data[pos-1];
-StringX: SAFEGET
+StringX: SAFEGET(18)
     if( let == '"' ) {
        int strLen = &data[pos-1] - strStart;
        jnode *newStr = (jnode *) node_str__new( strStart, strLen, 2 );
@@ -527,7 +573,7 @@ StringX: SAFEGET
        goto AfterVal; // should never be reached
     }
     goto StringX;   
-AfterVal: SAFE
+AfterVal: SAFE(19)
     // who cares about commas in between things; we can just ignore them :D
     goto Hash;
 Done:
