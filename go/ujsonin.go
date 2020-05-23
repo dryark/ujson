@@ -1,4 +1,4 @@
-package main
+package ujsoningo
 
 import (
     "fmt"
@@ -13,12 +13,12 @@ type JNode struct {
     str      *string
 }
 
-func ( self JNode ) get( key string ) ( *JNode ) {
+func ( self JNode ) Get( key string ) ( *JNode ) {
     if strings.Contains(key,".") {
         parts := strings.Split(key,".")
         cur := &self
         for _, part := range parts {
-            cur = cur.get(part)
+            cur = cur.Get(part)
             if cur == nil { return nil }
         }
         return cur
@@ -26,11 +26,11 @@ func ( self JNode ) get( key string ) ( *JNode ) {
     return self.hash[ key ]
 }
 
-func ( self JNode ) string() (string) {
+func ( self JNode ) String() (string) {
     return *self.str
 }
 
-func ( self JNode ) int() (int) {
+func ( self JNode ) Int() (int) {
     if( self.nodeType == 4 ) {
         i,_:=strconv.Atoi( *self.str )
         return i;
@@ -62,7 +62,7 @@ func ( self JNode ) add_item( el *JNode ) {
     self.parent = el
 }
 
-func ( self JNode ) dump() {
+func ( self JNode ) Dump() {
     self.dump_internal( 1 )
 }
 
@@ -123,7 +123,7 @@ func ( self JNode ) dump_val( depth int ) {
     }
 }
 
-func parse( data [] byte ) (*JNode) {
+func Parse( data [] byte ) (*JNode) {
     size := len( data )
     
     pos := 1
