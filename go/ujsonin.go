@@ -1,4 +1,4 @@
-package ujsoningo
+package go
 
 import (
     "fmt"
@@ -123,7 +123,8 @@ func ( self JNode ) dump_val( depth int ) {
     }
 }
 
-func Parse( data [] byte ) (*JNode) {
+func Parse( data []byte ) ( *JNode, []byte ) {
+    var remainder []byte
     size := len( data )
     
     pos := 1
@@ -146,8 +147,13 @@ Hash:
         pos--
         goto KeyName1
     }
-    if let == '}' && cur.parent != nil {
-        cur = cur.parent
+    if let == '}' {
+        if cur.parent != nil {
+            cur = cur.parent
+        } else {
+            remainder = data[pos:]
+            goto Done
+        }
     }
     if let == '/' && pos < (size-1) {
         if data[pos] == '/' {
@@ -341,5 +347,5 @@ AfterVal:
     // who cares about commas in between things; we can just ignore them :D
     goto Hash
 Done:
-    return root
+    return root, remainder
 }
