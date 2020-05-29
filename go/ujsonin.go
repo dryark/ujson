@@ -1,4 +1,4 @@
-package go
+package ujsoningo
 
 import (
     "fmt"
@@ -52,14 +52,15 @@ func NewNodeArr() ( *JNode ) {
 }
 
 func ( self JNode ) add_item( el *JNode ) {
-    last := self.parent // parent serves as last till the array is done
-    if last == nil {
+    oldLast := self.parent // parent serves as last till the array is done
+    if oldLast == nil {
         self.parent = el
+        fmt.Printf("setting first\n")
         self.hash["first"] = el
         return
     }
-    last.parent = el
-    self.parent = el
+    oldLast.parent = el // set "next"(parent) of the last element to the new last
+    self.parent = el // set the "last"(parent) of self to the new last item
 }
 
 func ( self JNode ) Dump() {
@@ -98,12 +99,12 @@ func ( self JNode ) dump_internal( depth int ) {
 
 func ( self JNode ) dump_array( depth int ) {
     fmt.Printf("[\n")
-    
     cur := self.parent
-    for cur != nil {
+    for {
         fmt.Printf(strings.Repeat("  ",depth));
         cur.dump_val( depth );
         cur = cur.parent
+        if cur == nil { break }
     }
     depth--;
     fmt.Printf("%s]\n",strings.Repeat("  ",depth))
@@ -262,9 +263,9 @@ AfterColon:
         goto AfterColon;
     }
     if let == ']' {
-        oldCur := cur
-        cur = cur.hash["parent"]
-        oldCur.parent = oldCur.hash["first"]
+        array := cur
+        cur = array.hash["parent"]
+        array.parent = array.hash["first"]
         if cur.nodeType == 3 { goto AfterColon }
         if cur.nodeType == 1 { goto Hash }
         // should never reach here
@@ -293,18 +294,20 @@ NumberX:
     //if( let == '.' ) goto AfterDot;
     if let < '0' || let > '9' {
         str := string( data[ strStart : pos - 1 ] )
-        newJNode := &JNode{ str: &str }
+        newJNode := JNode{ str: &str }
         if neg {
             newJNode.nodeType = 5
         } else {
             newJNode.nodeType = 4
         }
         if cur.nodeType == 1 {
-            cur.hash[ key ] = newJNode
+            cur.hash[ key ] = &newJNode
+            pos--
             goto AfterVal
         }
         if cur.nodeType == 3 {
-            cur.add_item( newJNode )
+            cur.add_item( &newJNode )
+            pos-- // so that ] gets recognized
             goto AfterColon
         }
     }
@@ -314,13 +317,13 @@ String1:
     pos++
     if( let == '"' ) {
        empty := ""
-       newJNode := &JNode{ nodeType: 2, str: &empty } 
+       newJNode := JNode{ nodeType: 2, str: &empty } 
        if cur.nodeType == 1 {
-           cur.hash[ key ] = newJNode
+           cur.hash[ key ] = &newJNode
            goto AfterVal
        }
        if cur.nodeType == 3 {
-           cur.add_item( newJNode )
+           cur.add_item( &newJNode )
            goto AfterColon
        }
        goto AfterVal // should be unreachable
