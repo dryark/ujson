@@ -10,14 +10,12 @@ It parses "JSON" with the following features:
 * Escaped double quotes within keys ( only in C )
 * Arrays
 * N-digit positive and negative integers
-* Booleans ( true/false ) ( only in C )
-* null ( only in C )
+* Booleans ( true/false )
+* null
 
 The following JSON features are not supported currently:
-* Booleans ( true/false ) ( for Golang )
 * Numbers with . or exponents
 * Escaped double quotes within values
-* null ( for Golang )
 
 The following additional "features" exist:
 * Commas between things can be added or left out; they have no effect
@@ -31,7 +29,6 @@ The following additional "features" exist:
   and containing only alphanumerics ) - for Golang only currently
 
 Known bugs / deficiencies:
-* There is no json__delete yet to clean up a parsed structure when no longer needed
 * Functions aren't prefixed with anything like ujson, nor are any kept private, so
   all of them essentially taint your global namespace and could interfere with other
   functions.
@@ -47,10 +44,13 @@ Known bugs / deficiencies:
 * JSON longer than 'int' size ( of your compiler ) isn't currently supported. If you
   are running on a 16-bit platform, this means 32k limit to JSON on those platforms.
   It depends on both your platform and your compiler really.
-* If you have a "unquoted value" other than true, false, or null, the parser currently crashes and exits
-  intentionally right now. This is obviously not the best result, and will be fixed soon. The reason
-  it is not implemented better yet is because doing it as desired is much more complicated due to types.
-  ( see the proposal below )
+  
+Resolves bugs / deficiences:
+* Solved by node_hash__delete -> There is no json__delete yet to clean up a parsed structure when no longer needed
+* Solved by implementation of types -> If you have a "unquoted value" other than true, false, or null, the parser
+    currently crashes and exits intentionally right now. This is obviously not the best result, and will be fixed
+    soon. The reason it is not implemented better yet is because doing it as desired is much more complicated due
+    to types.
   
 Proposols:
 * Extensions
