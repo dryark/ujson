@@ -1,4 +1,4 @@
-package ujsoningo
+package mod
 
 import (
     "fmt"
