@@ -13,10 +13,10 @@ type JNode struct {
     str      *string
 }
 
-func ( self JNode ) Get( key string ) ( *JNode ) {
+func ( self *JNode ) Get( key string ) ( *JNode ) {
     if strings.Contains(key,".") {
         parts := strings.Split(key,".")
-        cur := &self
+        cur := self
         for _, part := range parts {
             cur = cur.Get(part)
             if cur == nil { return nil }
@@ -30,16 +30,16 @@ func ( self JNode ) String() (string) {
     return *self.str
 }
 
-func ( self JNode ) Int() (int) {
+func ( self *JNode ) Int() (int) {
     if( self.nodeType == 4 ) {
-        i,_:=strconv.Atoi( *self.str )
+        i , _ := strconv.Atoi( *self.str )
         return i;
     }
     if( self.nodeType == 5 ) {
-        i,_:=strconv.Atoi( *self.str )
+        i , _ := strconv.Atoi( *self.str )
         return -i
     }
-    i,_:=strconv.Atoi( *self.str )
+    i , _ := strconv.Atoi( *self.str )
     return i
 }
 
@@ -51,7 +51,7 @@ func NewNodeArr() ( *JNode ) {
     return &JNode{ nodeType: 3, hash: NewNodeHash() }
 }
 
-func ( self JNode ) add_item( el *JNode ) {
+func ( self *JNode ) add_item( el *JNode ) {
     oldLast := self.parent // parent serves as last till the array is done
     if oldLast == nil {
         self.parent = el
@@ -63,11 +63,11 @@ func ( self JNode ) add_item( el *JNode ) {
     self.parent = el // set the "last"(parent) of self to the new last item
 }
 
-func ( self JNode ) Dump() {
+func ( self *JNode ) Dump() {
     self.dump_internal( 1 )
 }
 
-func ( self JNode ) dump_internal( depth int ) {
+func ( self *JNode ) dump_internal( depth int ) {
     fmt.Printf("{\n")
     
     for key, val := range self.hash {
@@ -97,7 +97,7 @@ func ( self JNode ) dump_internal( depth int ) {
     fmt.Printf("%s}\n",strings.Repeat("  ",depth))
 }
 
-func ( self JNode ) dump_array( depth int ) {
+func ( self *JNode ) dump_array( depth int ) {
     fmt.Printf("[\n")
     cur := self.parent
     for {
@@ -110,7 +110,7 @@ func ( self JNode ) dump_array( depth int ) {
     fmt.Printf("%s]\n",strings.Repeat("  ",depth))
 }
 
-func ( self JNode ) dump_val( depth int ) {
+func ( self *JNode ) dump_val( depth int ) {
     if self.nodeType == 1 {
         self.dump_internal( depth+1 )
     } else if self.nodeType == 2 {

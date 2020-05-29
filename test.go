@@ -3,7 +3,7 @@ package main
 import (
     "fmt"
     "io/ioutil"
-    uj "github.com/nanoscopic/ujsonin/go"
+    uj "github.com/nanoscopic/ujsonin/mod"
 )
 
 func main() {
