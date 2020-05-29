@@ -170,7 +170,7 @@ void jnode__dump_env( jnode *self ) {
     else if( self->type == 5 ) printf("-%.*s", ( (node_str *) self )->len, ( (node_str *) self )->str );  
     else if( self->type == 6 ) printf("true");
     else if( self->type == 7 ) printf("false");
-    else if( self->type == 8 ) printf("false");
+    else if( self->type == 8 ) printf("null");
     printf("\"");
 }
 

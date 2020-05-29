@@ -2,6 +2,7 @@ package mod
 
 import (
     "fmt"
+    "os"
     "strconv"
     "strings"
 )
@@ -121,16 +122,49 @@ func ( self *JNode ) dump_val( depth int ) {
         fmt.Printf("%s\n", *self.str )
     } else if self.nodeType == 5 {
         fmt.Printf("-%s\n", *self.str )
+    } else if self.nodeType == 6 {
+        fmt.Printf("true\n")
+    } else if self.nodeType == 7 {
+        fmt.Printf("false\n")
     }
+}
+
+var handlers map[string] func( []byte, int ) ( int, *JNode ) = make( map[string] func( []byte, int ) ( int, *JNode ) )
+
+func add_handler( name string, handler func( []byte, int ) ( int, *JNode ) ) {
+    handlers[ name ] = handler
+}
+
+func handle_true( data []byte, pos int ) ( int, *JNode ) {
+    return 0, &JNode{ nodeType: 6 }
+}
+
+func handle_false( data []byte, pos int ) ( int, *JNode ) {
+    return 0, &JNode{ nodeType: 7 }
+}
+
+func handle_null( data []byte, pos int ) ( int, *JNode ) {
+    return 0, &JNode{ nodeType: 8 }
+}
+
+func init() {
+    add_handler( "true", handle_true )
+    add_handler( "false", handle_false )
+    add_handler( "null", handle_null )
 }
 
 func Parse( data []byte ) ( *JNode, []byte ) {
     var remainder []byte
+    var dest int
+    var node *JNode
+    var handler func( []byte, int ) ( int, *JNode )
+    var typeWord string
     size := len( data )
     
     pos := 1
     keyStart := 0
     strStart := 0
+    typeStart := 0
     key := ""
     neg := false
     var let byte
@@ -230,6 +264,10 @@ AfterColon:
         cur = newJNode
         goto Hash
     }
+    if let >= 'a' && let <= 'z' {
+        typeStart = pos - 1
+        goto TypeX
+    }
     if let == '/' && pos < (size-1) {
         if data[pos] == '/' {
             pos++
@@ -269,8 +307,32 @@ AfterColon:
         if cur.nodeType == 3 { goto AfterColon }
         if cur.nodeType == 1 { goto Hash }
         // should never reach here
-    }    
+    }
     goto AfterColon;
+TypeX:
+    let = data[pos]
+    pos++
+    if ( let >= '0' && let <= '9' ) || ( let >= 'a' && let <= 'z' ) { goto TypeX }
+    pos--
+    typeWord = string( data[ typeStart : pos ] )
+    handler = handlers[ typeWord ]
+    if handler == nil {
+        fmt.Printf("unknown type '%s'\n", typeWord )
+        os.Exit(1)
+    }
+    dest, node = handler( data, pos )
+    if dest == 0 {
+        if cur.nodeType == 1 {
+            cur.hash[ key ] = node
+            goto AfterVal
+        } else if cur.nodeType == 3 {
+            cur.add_item( node )
+            goto AfterColon
+        }
+    }
+    fmt.Printf("unknown dest\n")
+    os.Exit(1)
+    goto TypeX
 AC_Comment:
     let = data[pos]
     pos++
