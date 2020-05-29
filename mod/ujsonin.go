@@ -55,7 +55,7 @@ func ( self JNode ) add_item( el *JNode ) {
     oldLast := self.parent // parent serves as last till the array is done
     if oldLast == nil {
         self.parent = el
-        fmt.Printf("setting first\n")
+        //fmt.Printf("setting first\n")
         self.hash["first"] = el
         return
     }
