@@ -31,6 +31,16 @@ func ( self JNode ) String() (string) {
     return *self.str
 }
 
+func ( self *JNode ) Bool() (bool) {
+    if( self.nodeType == 6 ) {
+        return true
+    }
+    if( self.nodeType == 7 ) {
+        return false
+    }
+    return false
+}
+
 func ( self *JNode ) Int() (int) {
     if( self.nodeType == 4 ) {
         i , _ := strconv.Atoi( *self.str )
@@ -39,6 +49,12 @@ func ( self *JNode ) Int() (int) {
     if( self.nodeType == 5 ) {
         i , _ := strconv.Atoi( *self.str )
         return -i
+    }
+    if( self.nodeType == 6 ) {
+        return 1
+    }
+    if( self.nodeType == 7 ) {
+        return 0
     }
     i , _ := strconv.Atoi( *self.str )
     return i
