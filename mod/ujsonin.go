@@ -114,6 +114,15 @@ func ( self *JNode ) dump_internal( depth int ) {
     fmt.Printf("%s}\n",strings.Repeat("  ",depth))
 }
 
+func ( self *JNode ) ForEach( handler func( *JNode ) ) {
+	cur := self.parent
+	for {
+		if cur == nil { break }
+		handler( cur )
+		cur = cur.parent
+	}
+}
+
 func ( self *JNode ) dump_array( depth int ) {
     fmt.Printf("[\n")
     cur := self.parent

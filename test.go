@@ -16,4 +16,9 @@ func main() {
     print("z:", sub.Get("z").Int() )
     print("\nneg:", root.Get("neg").Int() )
     print("\nz2:", root.Get("sub.z").Int() )
+    fmt.Println( "\narray items\n" )
+    arrnode := root.Get("arr")
+    arrnode.ForEach( func( item *uj.JNode ) {
+		fmt.Printf( "  item: %d\n", item.Int() )
+    } )
 }
