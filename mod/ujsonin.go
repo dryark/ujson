@@ -12,6 +12,7 @@ type JNode struct {
     nodeType uint8
     hash map [ string ] *JNode
     str      *string
+    count    uint8
 }
 
 func ( self *JNode ) Get( key string ) ( *JNode ) {
@@ -74,21 +75,23 @@ func ( self *JNode ) add_item( el *JNode ) {
         self.parent = el
         //fmt.Printf("setting first\n")
         self.hash["first"] = el
+        self.count = 1
         return
     }
     oldLast.parent = el // set "next"(parent) of the last element to the new last
     self.parent = el // set the "last"(parent) of self to the new last item
+    self.count = self.count + 1
 }
 
 func ( self *JNode ) Dump() {
-    self.dump_internal( 1 )
+	self.dump_val( 0 )
 }
 
 func ( self *JNode ) dump_internal( depth int ) {
     fmt.Printf("{\n")
     
     for key, val := range self.hash {
-        basicKey := true
+    	basicKey := true
         l := key[0]
         if ( ( l < 'a' && l > 'z' ) || ( l < 'A' && l > 'Z' ) ) {
             basicKey = false
@@ -115,9 +118,17 @@ func ( self *JNode ) dump_internal( depth int ) {
 }
 
 func ( self *JNode ) ForEach( handler func( *JNode ) ) {
+	if self.nodeType != 3 {
+		fmt.Println("not an array")
+		return
+	}
+	//fmt.Printf("Count: %d\n", self.count )
 	cur := self.parent
+	count := self.count
+	i := uint8( 0 )
 	for {
-		if cur == nil { break }
+		i = i + 1
+		if i > count { break }
 		handler( cur )
 		cur = cur.parent
 	}
@@ -126,11 +137,14 @@ func ( self *JNode ) ForEach( handler func( *JNode ) ) {
 func ( self *JNode ) dump_array( depth int ) {
     fmt.Printf("[\n")
     cur := self.parent
+    count := self.count
+	i := uint8( 0 )
     for {
+    	i = i + 1
+    	if i > count { break }
         fmt.Printf(strings.Repeat("  ",depth));
         cur.dump_val( depth );
         cur = cur.parent
-        if cur == nil { break }
     }
     depth--;
     fmt.Printf("%s]\n",strings.Repeat("  ",depth))
@@ -198,6 +212,7 @@ func Parse( data []byte ) ( *JNode, []byte ) {
     root := cur
 Hash:
     let = data[pos]
+    //if let != ' ' && let != '\n' { fmt.Printf("Hash %c %d\n", let, let ) }
     pos++
     if pos >= size { goto Done } 
     if let == '"' {
@@ -210,6 +225,11 @@ Hash:
     if let == '}' {
         if cur.parent != nil {
             cur = cur.parent
+            //fmt.Printf("Ascend to type %d\n", cur.nodeType)
+            if cur.nodeType == 3 {
+            	goto AfterColon
+            }
+            goto Hash
         } else {
             remainder = data[pos:]
             goto Done
@@ -250,10 +270,12 @@ QQKeyNameX:
     }
     goto QQKeyNameX
 KeyName1:
+	//fmt.Printf("KeyName1 %c %d\n", let, let )
     keyStart = pos
     pos++
 KeyNameX:
     let = data[pos]
+    //fmt.Printf("KeyNameX %c %d\n", let, let )
     pos++
     if let == ':' {
         key = string( data[ keyStart : pos - 1 ] )
@@ -273,6 +295,7 @@ Colon:
     goto Colon
 AfterColon:
     let = data[pos]
+    //if let != ' ' && let != '\n' { fmt.Printf("AfterColon %c %d\n", let, let ) }
     pos++
     if let == '"' {
         goto String1
@@ -315,6 +338,7 @@ AfterColon:
     }
     if let == '[' {
         newArr := NewNodeArr()
+        newArr.count = 0
         newArr.hash["parent"] = cur
         if cur.nodeType == 1 {
             cur.hash[ key ] = newArr
@@ -322,13 +346,15 @@ AfterColon:
         if cur.nodeType == 3 {
             cur.add_item( newArr )
         }
-        cur = newArr;
-        goto AfterColon;
+        cur = newArr
+        goto AfterColon
     }
     if let == ']' {
         array := cur
-        cur = array.hash["parent"]
+        cur = array.hash["parent"] // the original parent
         array.parent = array.hash["first"]
+        delete( array.hash, "parent" )
+        delete( array.hash, "first" )
         if cur.nodeType == 3 { goto AfterColon }
         if cur.nodeType == 1 { goto Hash }
         // should never reach here
@@ -349,7 +375,7 @@ TypeX:
     if dest == 0 {
         if cur.nodeType == 1 {
             cur.hash[ key ] = node
-            goto AfterVal
+            goto Hash
         } else if cur.nodeType == 3 {
             cur.add_item( node )
             goto AfterColon
@@ -390,7 +416,7 @@ NumberX:
         if cur.nodeType == 1 {
             cur.hash[ key ] = &newJNode
             pos--
-            goto AfterVal
+            goto Hash
         }
         if cur.nodeType == 3 {
             cur.add_item( &newJNode )
@@ -401,13 +427,14 @@ NumberX:
     goto NumberX;
 String1:
     let = data[pos]
+    //fmt.Printf("String1 %c %d\n", let, let )
     pos++
     if( let == '"' ) {
        empty := ""
        newJNode := JNode{ nodeType: 2, str: &empty } 
        if cur.nodeType == 1 {
            cur.hash[ key ] = &newJNode
-           goto AfterVal
+           goto Hash
        }
        if cur.nodeType == 3 {
            cur.add_item( &newJNode )
@@ -418,13 +445,14 @@ String1:
     strStart = pos - 1
 StringX:
     let = data[pos]
+    //fmt.Printf("StringX %c %d\n", let, let )
     pos++
     if let == '"' {
        str := string( data[ strStart : pos - 1 ] )
        newJNode := &JNode{ nodeType: 2, str: &str }
        if cur.nodeType == 1 {
            cur.hash[ key ] = newJNode
-           goto AfterVal
+           goto Hash
        }
        if cur.nodeType == 3 {
            cur.add_item( newJNode )
