@@ -215,6 +215,9 @@ Hash:
     //if let != ' ' && let != '\n' { fmt.Printf("Hash %c %d\n", let, let ) }
     pos++
     if pos >= size { goto Done } 
+    if let == '\'' {
+        goto QKeyName1
+    }
     if let == '"' {
         goto QQKeyName1
     }
@@ -258,6 +261,17 @@ HashComment2:
     pos++
     if( let == '*' && pos < (size-1) && data[pos] == '/' ) { pos++; goto Hash; }
     goto HashComment2;
+QKeyName1:
+    keyStart = pos
+    pos++
+QKeyNameX:
+    let = data[pos]
+    pos++
+    if let == '\'' {
+        key = string( data[ keyStart : pos - 1 ] )
+        goto Colon
+    }
+    goto QKeyNameX
 QQKeyName1:
     keyStart = pos
     pos++
@@ -299,6 +313,9 @@ AfterColon:
     pos++
     if let == '"' {
         goto String1
+    }
+    if let == '\'' {
+        goto SQString1
     }
     if let == '{' {
         newJNode := &JNode{ nodeType: 1, hash: NewNodeHash() }
@@ -425,6 +442,42 @@ NumberX:
         }
     }
     goto NumberX;
+SQString1:
+    let = data[pos]
+    //fmt.Printf("String1 %c %d\n", let, let )
+    pos++
+    if( let == '\'' ) {
+       empty := ""
+       newJNode := JNode{ nodeType: 2, str: &empty } 
+       if cur.nodeType == 1 {
+           cur.hash[ key ] = &newJNode
+           goto Hash
+       }
+       if cur.nodeType == 3 {
+           cur.add_item( &newJNode )
+           goto AfterColon
+       }
+       goto AfterVal // should be unreachable
+    }
+    strStart = pos - 1
+SQStringX:
+    let = data[pos]
+    //fmt.Printf("StringX %c %d\n", let, let )
+    pos++
+    if let == '\'' {
+       str := string( data[ strStart : pos - 1 ] )
+       newJNode := &JNode{ nodeType: 2, str: &str }
+       if cur.nodeType == 1 {
+           cur.hash[ key ] = newJNode
+           goto Hash
+       }
+       if cur.nodeType == 3 {
+           cur.add_item( newJNode )
+           goto AfterColon
+       }
+       goto AfterVal // should be unreachable
+    }
+    goto SQStringX;
 String1:
     let = data[pos]
     //fmt.Printf("String1 %c %d\n", let, let )
@@ -460,7 +513,7 @@ StringX:
        }
        goto AfterVal // should be unreachable
     }
-    goto StringX;   
+    goto StringX;
 AfterVal:
     // who cares about commas in between things; we can just ignore them :D
     goto Hash
