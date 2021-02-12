@@ -218,7 +218,7 @@ Hash:
     if let == '"' {
         goto QQKeyName1
     }
-    if let >= 'a' && let <= 'z' {
+    if let >= 'a' && let <= 'z' || let >= 'A' && let <= 'Z' {
         pos--
         goto KeyName1
     }
