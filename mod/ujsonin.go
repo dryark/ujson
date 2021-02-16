@@ -7,9 +7,20 @@ import (
     "strings"
 )
 
+const (
+    TYPE_HASH = iota + 1
+    TYPE_STR
+    TYPE_ARR
+    TYPE_POS
+    TYPE_NEG
+    TYPE_TRUE
+    TYPE_FALSE
+    TYPE_NULL
+)
+
 type JNode struct {
     parent   *JNode
-    nodeType uint8
+    NodeType uint8
     hash map [ string ] *JNode
     str      *string
     count    uint8
@@ -28,33 +39,55 @@ func ( self *JNode ) Get( key string ) ( *JNode ) {
     return self.hash[ key ]
 }
 
+func ( self *JNode ) Overlay( ontop *JNode ) {
+    if self.NodeType != TYPE_HASH { return }
+    if ontop.NodeType != TYPE_HASH { return }
+    
+    for key, ontopVal := range ontop.hash {
+        val, valOk := self.hash[ key ]
+        if ontopVal.NodeType == TYPE_HASH {
+            if !valOk {
+                self.hash[ key ] = ontopVal
+            } else {
+                val.Overlay( ontopVal )
+            }
+        } else {
+            if !valOk || ontopVal.NodeType != TYPE_HASH {
+                self.hash[ key ] = ontopVal
+            }
+            continue
+        }
+        
+    }
+}
+
 func ( self JNode ) String() (string) {
     return *self.str
 }
 
 func ( self *JNode ) Bool() (bool) {
-    if( self.nodeType == 6 ) {
+    if( self.NodeType == TYPE_TRUE ) {
         return true
     }
-    if( self.nodeType == 7 ) {
+    if( self.NodeType == TYPE_FALSE ) {
         return false
     }
     return false
 }
 
 func ( self *JNode ) Int() (int) {
-    if( self.nodeType == 4 ) {
+    if( self.NodeType == TYPE_POS ) {
         i , _ := strconv.Atoi( *self.str )
         return i;
     }
-    if( self.nodeType == 5 ) {
+    if( self.NodeType == TYPE_NEG ) {
         i , _ := strconv.Atoi( *self.str )
         return -i
     }
-    if( self.nodeType == 6 ) {
+    if( self.NodeType == TYPE_TRUE ) {
         return 1
     }
-    if( self.nodeType == 7 ) {
+    if( self.NodeType == TYPE_FALSE ) {
         return 0
     }
     i , _ := strconv.Atoi( *self.str )
@@ -66,7 +99,7 @@ func NewNodeHash() ( map [ string ] *JNode ) {
 }
 
 func NewNodeArr() ( *JNode ) {
-    return &JNode{ nodeType: 3, hash: NewNodeHash() }
+    return &JNode{ NodeType: TYPE_ARR, hash: NewNodeHash() }
 }
 
 func ( self *JNode ) add_item( el *JNode ) {
@@ -83,14 +116,26 @@ func ( self *JNode ) add_item( el *JNode ) {
     self.count = self.count + 1
 }
 
-func ( self *JNode ) Dump() {
-	self.dump_val( 0 )
+func (self *JNode) Dump() {
+	self.dump_val( 0, false )
 }
 
-func ( self *JNode ) dump_internal( depth int ) {
+func (self *JNode) Json() {
+    self.dump_val( 0, true )
+}
+
+func ( self *JNode ) dump_internal( depth int, json bool ) {
     fmt.Printf("{\n")
     
+    keyNum := 0
     for key, val := range self.hash {
+        if keyNum > 0 {
+            if json {
+                fmt.Printf(",\n")
+            } else {
+                fmt.Printf("\n")
+            }
+        }
     	basicKey := true
         l := key[0]
         if ( ( l < 'a' && l > 'z' ) || ( l < 'A' && l > 'Z' ) ) {
@@ -106,19 +151,20 @@ func ( self *JNode ) dump_internal( depth int ) {
                 }
             }
         }
-        if basicKey {
-            fmt.Printf("%s%s:",strings.Repeat("  ",depth), key);
+        if !json && basicKey {
+            fmt.Printf("%s%s:",strings.Repeat("  ",depth), key)
         } else {
-            fmt.Printf("%s\"%s\":",strings.Repeat("  ",depth), key);
+            fmt.Printf("%s\"%s\":",strings.Repeat("  ",depth), key)
         }
-        val.dump_val( depth );
+        val.dump_val( depth, json )
+        keyNum++
     }
     depth--;
-    fmt.Printf("%s}\n",strings.Repeat("  ",depth))
+    fmt.Printf("\n%s}",strings.Repeat("  ",depth))
 }
 
 func ( self *JNode ) ForEach( handler func( *JNode ) ) {
-	if self.nodeType != 3 {
+	if self.NodeType != TYPE_ARR {
 		fmt.Println("not an array")
 		return
 	}
@@ -134,7 +180,17 @@ func ( self *JNode ) ForEach( handler func( *JNode ) ) {
 	}
 }
 
-func ( self *JNode ) dump_array( depth int ) {
+func ( self *JNode ) ForEachKeyed( handler func( string, *JNode ) ) {
+  if self.NodeType != TYPE_HASH {
+    fmt.Println("not a hash")
+    return
+  }
+  for key, node := range self.hash {
+    handler( key, node )
+  }
+}
+
+func ( self *JNode ) dump_array( depth int, json bool ) {
     fmt.Printf("[\n")
     cur := self.parent
     count := self.count
@@ -142,29 +198,38 @@ func ( self *JNode ) dump_array( depth int ) {
     for {
     	i = i + 1
     	if i > count { break }
-        fmt.Printf(strings.Repeat("  ",depth));
-        cur.dump_val( depth );
+        fmt.Printf(strings.Repeat("  ",depth))
+        cur.dump_val( depth, json )
+        if i != count {
+            if json {
+                fmt.Printf(",\n")
+            } else {
+                fmt.Printf("\n")
+            }
+        }
         cur = cur.parent
     }
     depth--;
-    fmt.Printf("%s]\n",strings.Repeat("  ",depth))
+    fmt.Printf("\n%s]",strings.Repeat("  ",depth))
 }
 
-func ( self *JNode ) dump_val( depth int ) {
-    if self.nodeType == 1 {
-        self.dump_internal( depth+1 )
-    } else if self.nodeType == 2 {
-        fmt.Printf("\"%s\"\n", *self.str )
-    } else if self.nodeType == 3 {
-        self.dump_array( depth+1 )
-    } else if self.nodeType == 4 {
-        fmt.Printf("%s\n", *self.str )
-    } else if self.nodeType == 5 {
-        fmt.Printf("-%s\n", *self.str )
-    } else if self.nodeType == 6 {
-        fmt.Printf("true\n")
-    } else if self.nodeType == 7 {
-        fmt.Printf("false\n")
+func ( self *JNode ) dump_val( depth int, json bool ) {
+    if self.NodeType == TYPE_HASH {
+        self.dump_internal( depth+1, json )
+    } else if self.NodeType == TYPE_STR {
+        fmt.Printf("\"%s\"", *self.str )
+    } else if self.NodeType == TYPE_ARR {
+        self.dump_array( depth+1, json )
+    } else if self.NodeType == TYPE_POS { // positive number
+        fmt.Printf("%s", *self.str )
+    } else if self.NodeType == TYPE_NEG { // negative number
+        fmt.Printf("-%s", *self.str )
+    } else if self.NodeType == TYPE_TRUE {
+        fmt.Printf("true")
+    } else if self.NodeType == TYPE_FALSE {
+        fmt.Printf("false")
+    } else if self.NodeType == TYPE_NULL {
+        fmt.Printf("null")
     }
 }
 
@@ -175,15 +240,15 @@ func add_handler( name string, handler func( []byte, int ) ( int, *JNode ) ) {
 }
 
 func handle_true( data []byte, pos int ) ( int, *JNode ) {
-    return 0, &JNode{ nodeType: 6 }
+    return 0, &JNode{ NodeType: TYPE_TRUE }
 }
 
 func handle_false( data []byte, pos int ) ( int, *JNode ) {
-    return 0, &JNode{ nodeType: 7 }
+    return 0, &JNode{ NodeType: TYPE_FALSE }
 }
 
 func handle_null( data []byte, pos int ) ( int, *JNode ) {
-    return 0, &JNode{ nodeType: 8 }
+    return 0, &JNode{ NodeType: TYPE_NULL }
 }
 
 func init() {
@@ -208,7 +273,7 @@ func Parse( data []byte ) ( *JNode, []byte ) {
     neg := false
     var let byte
     
-    cur := &JNode{ nodeType: 1, hash: NewNodeHash() }
+    cur := &JNode{ NodeType: TYPE_HASH, hash: NewNodeHash() }
     root := cur
 Hash:
     let = data[pos]
@@ -228,8 +293,8 @@ Hash:
     if let == '}' {
         if cur.parent != nil {
             cur = cur.parent
-            //fmt.Printf("Ascend to type %d\n", cur.nodeType)
-            if cur.nodeType == 3 {
+            //fmt.Printf("Ascend to type %d\n", cur.NodeType)
+            if cur.NodeType == TYPE_ARR {
             	goto AfterColon
             }
             goto Hash
@@ -318,12 +383,12 @@ AfterColon:
         goto SQString1
     }
     if let == '{' {
-        newJNode := &JNode{ nodeType: 1, hash: NewNodeHash() }
+        newJNode := &JNode{ NodeType: TYPE_HASH, hash: NewNodeHash() }
         newJNode.parent = cur;
-        if cur.nodeType == 1 {
+        if cur.NodeType == TYPE_HASH {
             cur.hash[ key ] = newJNode
         }
-        if cur.nodeType == 3 {
+        if cur.NodeType == TYPE_ARR {
             cur.add_item( newJNode )
         }
         cur = newJNode
@@ -357,10 +422,10 @@ AfterColon:
         newArr := NewNodeArr()
         newArr.count = 0
         newArr.hash["parent"] = cur
-        if cur.nodeType == 1 {
+        if cur.NodeType == TYPE_HASH {
             cur.hash[ key ] = newArr
         }
-        if cur.nodeType == 3 {
+        if cur.NodeType == TYPE_ARR {
             cur.add_item( newArr )
         }
         cur = newArr
@@ -372,8 +437,8 @@ AfterColon:
         array.parent = array.hash["first"]
         delete( array.hash, "parent" )
         delete( array.hash, "first" )
-        if cur.nodeType == 3 { goto AfterColon }
-        if cur.nodeType == 1 { goto Hash }
+        if cur.NodeType == TYPE_ARR { goto AfterColon }
+        if cur.NodeType == TYPE_HASH { goto Hash }
         // should never reach here
     }
     goto AfterColon;
@@ -390,10 +455,10 @@ TypeX:
     }
     dest, node = handler( data, pos )
     if dest == 0 {
-        if cur.nodeType == 1 {
+        if cur.NodeType == TYPE_HASH {
             cur.hash[ key ] = node
             goto Hash
-        } else if cur.nodeType == 3 {
+        } else if cur.NodeType == TYPE_ARR {
             cur.add_item( node )
             goto AfterColon
         }
@@ -426,16 +491,16 @@ NumberX:
         str := string( data[ strStart : pos - 1 ] )
         newJNode := JNode{ str: &str }
         if neg {
-            newJNode.nodeType = 5
+            newJNode.NodeType = TYPE_NEG
         } else {
-            newJNode.nodeType = 4
+            newJNode.NodeType = TYPE_POS
         }
-        if cur.nodeType == 1 {
+        if cur.NodeType == 1 {
             cur.hash[ key ] = &newJNode
             pos--
             goto Hash
         }
-        if cur.nodeType == 3 {
+        if cur.NodeType == TYPE_ARR {
             cur.add_item( &newJNode )
             pos-- // so that ] gets recognized
             goto AfterColon
@@ -448,12 +513,12 @@ SQString1:
     pos++
     if( let == '\'' ) {
        empty := ""
-       newJNode := JNode{ nodeType: 2, str: &empty } 
-       if cur.nodeType == 1 {
+       newJNode := JNode{ NodeType: TYPE_STR, str: &empty } 
+       if cur.NodeType == TYPE_HASH {
            cur.hash[ key ] = &newJNode
            goto Hash
        }
-       if cur.nodeType == 3 {
+       if cur.NodeType == TYPE_ARR {
            cur.add_item( &newJNode )
            goto AfterColon
        }
@@ -466,12 +531,12 @@ SQStringX:
     pos++
     if let == '\'' {
        str := string( data[ strStart : pos - 1 ] )
-       newJNode := &JNode{ nodeType: 2, str: &str }
-       if cur.nodeType == 1 {
+       newJNode := &JNode{ NodeType: TYPE_STR, str: &str }
+       if cur.NodeType == TYPE_HASH {
            cur.hash[ key ] = newJNode
            goto Hash
        }
-       if cur.nodeType == 3 {
+       if cur.NodeType == TYPE_ARR {
            cur.add_item( newJNode )
            goto AfterColon
        }
@@ -484,12 +549,12 @@ String1:
     pos++
     if( let == '"' ) {
        empty := ""
-       newJNode := JNode{ nodeType: 2, str: &empty } 
-       if cur.nodeType == 1 {
+       newJNode := JNode{ NodeType: TYPE_STR, str: &empty } 
+       if cur.NodeType == TYPE_HASH {
            cur.hash[ key ] = &newJNode
            goto Hash
        }
-       if cur.nodeType == 3 {
+       if cur.NodeType == TYPE_ARR {
            cur.add_item( &newJNode )
            goto AfterColon
        }
@@ -502,12 +567,12 @@ StringX:
     pos++
     if let == '"' {
        str := string( data[ strStart : pos - 1 ] )
-       newJNode := &JNode{ nodeType: 2, str: &str }
-       if cur.nodeType == 1 {
+       newJNode := &JNode{ NodeType: TYPE_STR, str: &str }
+       if cur.NodeType == TYPE_HASH {
            cur.hash[ key ] = newJNode
            goto Hash
        }
-       if cur.nodeType == 3 {
+       if cur.NodeType == TYPE_ARR {
            cur.add_item( newJNode )
            goto AfterColon
        }
