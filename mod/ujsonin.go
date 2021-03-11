@@ -5,6 +5,7 @@ import (
     "os"
     "strconv"
     "strings"
+    "reflect"
 )
 
 const (
@@ -18,20 +19,73 @@ const (
     TYPE_NULL
 )
 
-type JNode struct {
-    parent   *JNode
+type JNode interface {
+    Parent() ( JNode, uint8 )
+    Type() uint8
+    Get( key string ) JNode
+    GetAt( pos int ) JNode
+    Overlay( ontop JNode )
+    
+    String() string
+    Bool() bool
+    Int() int
+    
+    ForEach( handler func( JNode ) )
+    ForEachKeyed( handler func( string, JNode ) )
+    Dump()
+    Json()
+    DumpInternal( depth int, json bool )
+    Add( key string, node JNode )
+}
+
+type JHash struct {
+    parent   JNode
     NodeType uint8
-    hash map [ string ] *JNode
-    str      *string
+    hash map [ string ] JNode
     count    uint8
 }
 
-func ( self *JNode ) Get( key string ) ( *JNode ) {
+type JArr struct {
+    parent   JNode
+    NodeType uint8
+    arr [] JNode
+}
+
+type JVal struct {
+    NodeType uint8
+    str string
+}
+
+func ( self *JHash ) Parent() (JNode,uint8) {
+    if self.parent != nil { return self.parent, self.parent.Type() }
+    return nil, 0
+}
+func ( self *JArr ) Parent() (JNode,uint8) {
+    if self.parent != nil { return self.parent, self.parent.Type() }
+    return nil, 0
+}
+func ( self *JVal ) Parent() (JNode,uint8) { return nil, 0 }
+
+func ( self *JHash ) Type() (uint8) { return self.NodeType }
+func ( self *JArr ) Type() (uint8) { return self.NodeType }
+func ( self *JVal ) Type() (uint8) { return self.NodeType }
+
+func (self *JHash) GetAt( _ int ) JNode { return nil }
+func (self *JVal) GetAt( _ int ) JNode { return nil }
+
+func ( self *JArr ) GetAt( pos int ) JNode {
+    return self.arr[ pos ]
+}
+
+func ( self *JArr ) Get( _ string ) (JNode) { return nil }
+func ( self *JVal ) Get( _ string ) (JNode) { return nil }
+
+func ( self *JHash ) Get( key string ) JNode {
     if strings.Contains(key,".") {
         parts := strings.Split(key,".")
-        cur := self
+        cur := JNode( self )
         for _, part := range parts {
-            cur = cur.Get(part)
+            cur = cur.Get( part )
             if cur == nil { return nil }
         }
         return cur
@@ -39,33 +93,41 @@ func ( self *JNode ) Get( key string ) ( *JNode ) {
     return self.hash[ key ]
 }
 
-func ( self *JNode ) Overlay( ontop *JNode ) {
-    if self.NodeType != TYPE_HASH { return }
-    if ontop.NodeType != TYPE_HASH { return }
-    
-    for key, ontopVal := range ontop.hash {
-        val, valOk := self.hash[ key ]
-        if ontopVal.NodeType == TYPE_HASH {
-            if !valOk {
-                self.hash[ key ] = ontopVal
+func ( self *JArr ) Overlay( _ JNode )  {}
+func ( self *JVal ) Overlay( _ JNode )  {}
+
+func ( self *JHash ) Overlay( ontop JNode ) {
+    ontop.ForEachKeyed( func( key string, ontopVal JNode ) {
+        val := self.Get( key )
+        ontopType := ontopVal.Type()
+        if ontopType == TYPE_HASH {
+            if val == nil {
+                self.Add( key, ontopVal )
             } else {
                 val.Overlay( ontopVal )
             }
         } else {
-            if !valOk || ontopVal.NodeType != TYPE_HASH {
-                self.hash[ key ] = ontopVal
-            }
-            continue
+            //if !valOk || ontopType != TYPE_HASH {
+                self.Add( key, ontopVal )
+            //}
         }
         
-    }
+    } )
 }
 
-func ( self JNode ) String() (string) {
-    return *self.str
+func ( self *JHash ) String() (string) { return "" }
+func ( self *JHash ) Bool() (bool) { return false }
+func ( self *JHash ) ForEach( handler func( JNode ) ) {}
+
+func ( self *JArr ) String() (string) { return "" }
+func ( self *JArr ) Bool() (bool) { return false }
+func ( self *JArr ) ForEachKeyed( handler func( string, JNode ) ) {}
+
+func ( self JVal ) String() (string) {
+    return self.str
 }
 
-func ( self *JNode ) Bool() (bool) {
+func ( self JVal ) Bool() (bool) {
     if( self.NodeType == TYPE_TRUE ) {
         return true
     }
@@ -75,13 +137,16 @@ func ( self *JNode ) Bool() (bool) {
     return false
 }
 
-func ( self *JNode ) Int() (int) {
+func ( self *JHash ) Int() int { return 0 }
+func ( self *JArr ) Int() int { return 0 }
+
+func ( self *JVal ) Int() (int) {
     if( self.NodeType == TYPE_POS ) {
-        i , _ := strconv.Atoi( *self.str )
+        i , _ := strconv.Atoi( self.str )
         return i;
     }
     if( self.NodeType == TYPE_NEG ) {
-        i , _ := strconv.Atoi( *self.str )
+        i , _ := strconv.Atoi( self.str )
         return -i
     }
     if( self.NodeType == TYPE_TRUE ) {
@@ -90,41 +155,36 @@ func ( self *JNode ) Int() (int) {
     if( self.NodeType == TYPE_FALSE ) {
         return 0
     }
-    i , _ := strconv.Atoi( *self.str )
+    i , _ := strconv.Atoi( self.str )
     return i
 }
 
-func NewNodeHash() ( map [ string ] *JNode ) {
-    return make( map [ string ] *JNode )
+func NewJHash( parent JNode ) JNode {
+    return JNode( &JHash{
+        parent: parent,
+        NodeType: TYPE_HASH,
+        hash: make( map [ string ] JNode ),
+    } )
 }
 
-func NewNodeArr() ( *JNode ) {
-    return &JNode{ NodeType: TYPE_ARR, hash: NewNodeHash() }
+func NewJArr( parent JNode ) JNode {
+    return JNode( &JArr{
+        parent: parent,
+        NodeType: TYPE_ARR,
+    } )
 }
 
-func ( self *JNode ) add_item( el *JNode ) {
-    oldLast := self.parent // parent serves as last till the array is done
-    if oldLast == nil {
-        self.parent = el
-        //fmt.Printf("setting first\n")
-        self.hash["first"] = el
-        self.count = 1
-        return
-    }
-    oldLast.parent = el // set "next"(parent) of the last element to the new last
-    self.parent = el // set the "last"(parent) of self to the new last item
-    self.count = self.count + 1
+func (self *JVal) Add( _ string, _ JNode) {}
+
+func (self *JHash) Add( key string, el JNode ) {
+    self.hash[ key ] = el
 }
 
-func (self *JNode) Dump() {
-	self.dump_val( 0, false )
+func (self *JArr) Add( _ string, el JNode ) {
+    self.arr = append( self.arr, el )
 }
 
-func (self *JNode) Json() {
-    self.dump_val( 0, true )
-}
-
-func ( self *JNode ) dump_internal( depth int, json bool ) {
+func (self *JHash) DumpInternal( depth int, json bool ) {
     fmt.Printf("{\n")
     
     keyNum := 0
@@ -154,76 +214,69 @@ func ( self *JNode ) dump_internal( depth int, json bool ) {
         if !json && basicKey {
             fmt.Printf("%s%s:",strings.Repeat("  ",depth), key)
         } else {
-            fmt.Printf("%s\"%s\":",strings.Repeat("  ",depth), key)
+            fmt.Printf("%s\"%s\":",strings.Repeat("  ",depth+1), key)
         }
-        val.dump_val( depth, json )
+        val.DumpInternal( depth+1, json )
         keyNum++
     }
     depth--;
     fmt.Printf("\n%s}",strings.Repeat("  ",depth))
 }
 
-func ( self *JNode ) ForEach( handler func( *JNode ) ) {
-	if self.NodeType != TYPE_ARR {
-		fmt.Println("not an array")
-		return
-	}
-	//fmt.Printf("Count: %d\n", self.count )
-	cur := self.parent
-	count := self.count
-	i := uint8( 0 )
-	for {
-		i = i + 1
-		if i > count { break }
-		handler( cur )
-		cur = cur.parent
+//func ( self *JHash ) ForEach( _ func( JNode ) ) {}
+func ( self *JVal ) ForEach( _ func( JNode ) ) {}
+
+func ( self *JArr ) ForEach( handler func( JNode ) ) {
+	for _, val := range( self.arr ) {
+	    handler( val )
 	}
 }
 
-func ( self *JNode ) ForEachKeyed( handler func( string, *JNode ) ) {
-  if self.NodeType != TYPE_HASH {
-    fmt.Println("not a hash")
-    return
-  }
+func ( self *JVal ) ForEachKeyed( _ func( string, JNode ) ) {}
+
+func ( self *JHash ) ForEachKeyed( handler func( string, JNode ) ) {
   for key, node := range self.hash {
     handler( key, node )
   }
 }
 
-func ( self *JNode ) dump_array( depth int, json bool ) {
+func ( self *JArr ) DumpInternal( depth int, json bool ) {
     fmt.Printf("[\n")
-    cur := self.parent
-    count := self.count
-	i := uint8( 0 )
-    for {
-    	i = i + 1
-    	if i > count { break }
-        fmt.Printf(strings.Repeat("  ",depth))
-        cur.dump_val( depth, json )
-        if i != count {
+    
+    i := 0
+    maxi := len( self.arr ) - 1
+    for _, el := range self.arr {
+        fmt.Printf( strings.Repeat("  ",depth) )
+        el.DumpInternal( depth, json )
+        if i != maxi {
             if json {
                 fmt.Printf(",\n")
             } else {
                 fmt.Printf("\n")
             }
         }
-        cur = cur.parent
+        i++
     }
-    depth--;
-    fmt.Printf("\n%s]",strings.Repeat("  ",depth))
+    fmt.Printf("\n%s]",strings.Repeat("  ",depth-1))
 }
 
-func ( self *JNode ) dump_val( depth int, json bool ) {
-    if self.NodeType == TYPE_HASH {
-        self.dump_internal( depth+1, json )
-    } else if self.NodeType == TYPE_STR {
-        fmt.Printf("\"%s\"", *self.str )
-    } else if self.NodeType == TYPE_ARR {
-        self.dump_array( depth+1, json )
+func ( self *JHash ) Dump() { self.DumpInternal( 1, false ) }
+func ( self *JArr  ) Dump() { self.DumpInternal( 1, false ) }
+func ( self *JVal  ) Dump() { self.DumpInternal( 1, false ) }
+
+func ( self *JHash ) Json() { self.DumpInternal( 1, true ) }
+func ( self *JArr  ) Json() { self.DumpInternal( 1, true ) }
+func ( self *JVal  ) Json() { self.DumpInternal( 1, true ) }
+
+func ( self *JVal ) DumpInternal( depth int, json bool ) {
+    if self.NodeType == TYPE_STR {
+        //out := strings.ReplaceAll( self.str, "\\", "\\\\" )
+        out := strings.ReplaceAll( self.str, "\"", "\\\"" )
+        fmt.Printf("\"%s\"", out )
     } else if self.NodeType == TYPE_POS { // positive number
-        fmt.Printf("%s", *self.str )
+        fmt.Printf("%s", self.str )
     } else if self.NodeType == TYPE_NEG { // negative number
-        fmt.Printf("-%s", *self.str )
+        fmt.Printf("-%s", self.str )
     } else if self.NodeType == TYPE_TRUE {
         fmt.Printf("true")
     } else if self.NodeType == TYPE_FALSE {
@@ -233,77 +286,169 @@ func ( self *JNode ) dump_val( depth int, json bool ) {
     }
 }
 
-var handlers map[string] func( []byte, int ) ( int, *JNode ) = make( map[string] func( []byte, int ) ( int, *JNode ) )
+var handlers map[string] func( []byte, int ) ( int, JNode ) = make( map[string] func( []byte, int ) ( int, JNode ) )
 
-func add_handler( name string, handler func( []byte, int ) ( int, *JNode ) ) {
+func add_handler( name string, handler func( []byte, int ) ( int, JNode ) ) {
     handlers[ name ] = handler
 }
 
-func handle_true( data []byte, pos int ) ( int, *JNode ) {
-    return 0, &JNode{ NodeType: TYPE_TRUE }
+func handle_true( data []byte, pos int ) ( int, JNode ) {
+    return 0, &JVal{ NodeType: TYPE_TRUE }
 }
 
-func handle_false( data []byte, pos int ) ( int, *JNode ) {
-    return 0, &JNode{ NodeType: TYPE_FALSE }
+func handle_false( data []byte, pos int ) ( int, JNode ) {
+    return 0, &JVal{ NodeType: TYPE_FALSE }
 }
 
-func handle_null( data []byte, pos int ) ( int, *JNode ) {
-    return 0, &JNode{ NodeType: TYPE_NULL }
+func handle_null( data []byte, pos int ) ( int, JNode ) {
+    return 0, &JVal{ NodeType: TYPE_NULL }
 }
 
 func init() {
-    add_handler( "true", handle_true )
+    add_handler( "true",  handle_true  )
     add_handler( "false", handle_false )
-    add_handler( "null", handle_null )
+    add_handler( "null",  handle_null  )
 }
 
-func Parse( data []byte ) ( *JNode, []byte ) {
+type ParseError struct {
+    text string
+    state string
+}
+
+func Parse( data []byte ) ( JNode, []byte ) {
+    root, remainder, err := ParseFull( data )
+    if err != nil {
+        panic( err.text )
+    }
+    return root, remainder
+}
+
+func ParseFull( data []byte ) ( JNode, []byte, *ParseError ) {
+    // This error catching exists to avoid having to check data bounds
+    //   every place as the data is iterated through. Instead of checking
+    //   the bounds I rely on Go to panic when it occurs and then catch
+    //   the panic.
+    // This isn't entirely clean, because it doesn't provide the knowledge
+    //   of at which point ( in the state machine ) the error occurred.
+    // Realistically this is silly and a check should just be added for
+    //   every access instead of messing with recover and reflection.
+    var err *ParseError
+    defer func() {
+		if rerr := recover(); rerr != nil {
+		    typ := reflect.TypeOf(rerr).Name()
+		    if typ == "boundsError" {
+		        fmt.Fprintf( os.Stdout, "Typ: %s\n", typ )
+		        err = &ParseError{ text: "test" }
+		    } else { panic(rerr) }
+		}
+	}()
+	
     var remainder []byte
     var dest int
-    var node *JNode
-    var handler func( []byte, int ) ( int, *JNode )
+    var node JNode
+    var handler func( []byte, int ) ( int, JNode )
     var typeWord string
     size := len( data )
+    endi := size - 1
+    if Debug { fmt.Printf("Start of Parse; len=%d\n", size ) }
     
-    pos := 1
+    pos := 0
     keyStart := 0
     strStart := 0
     typeStart := 0
     key := ""
     neg := false
     var let byte
+    endc := byte('"')
+    str := ""
+    finalState := ""
+    substrStart := 0
     
-    cur := &JNode{ NodeType: TYPE_HASH, hash: NewNodeHash() }
-    root := cur
-Hash:
+    nodeType := uint8( 0 )
+    //cur = NewJHash( nil )
+    var cur JNode
+    var root JNode //:= cur
+UnknownRoot:
+    if pos > endi { finalState="UnknownRoot"; goto OverEnd }
     let = data[pos]
-    //if let != ' ' && let != '\n' { fmt.Printf("Hash %c %d\n", let, let ) }
+    if Debug { if let != ' ' && let != '\n' { fmt.Printf("UnknownRoot %c %d\n", let, let ) } }
     pos++
     if pos >= size { goto Done } 
+    if let == '{' {
+        cur = NewJHash( nil )
+        root = cur
+        nodeType = TYPE_HASH
+        goto Hash
+    }
+    if let == '[' {
+        cur = NewJArr( nil )
+        root = cur
+        nodeType = TYPE_ARR
+        goto AfterColon
+    }
     if let == '\'' {
+        endc = '\''
+        cur = NewJHash( nil )
+        root = cur
+        nodeType = TYPE_HASH
         goto QKeyName1
     }
     if let == '"' {
-        goto QQKeyName1
+        endc = '"'
+        cur = NewJHash( nil )
+        root = cur
+        nodeType = TYPE_HASH
+        goto QKeyName1
+    }
+    if let >= 'a' && let <= 'z' || let >= 'A' && let <= 'Z' {
+        pos--
+        cur = NewJHash( nil )
+        root = cur
+        nodeType = TYPE_HASH
+        goto KeyName1
+    }
+    if let == '/' && pos < (size-1) {
+        if pos > endi { finalState="UnknownRoot+1"; goto OverEnd }
+        if data[pos] == '/' {
+            pos++
+            goto RootHashComment
+        }
+        if data[pos] == '*' {
+            pos++
+            goto RootHashComment2
+        }
+    }
+    goto UnknownRoot
+Hash:
+    if pos > endi { finalState="Hash"; goto OverEnd }
+    let = data[pos]
+    if Debug { if let != ' ' && let != '\n' { fmt.Printf("Hash %c %d\n", let, let ) } }
+    pos++
+    if let == '\'' {
+        endc = '\''
+        goto QKeyName1
+    }
+    if let == '"' {
+        endc = '"'
+        goto QKeyName1
     }
     if let >= 'a' && let <= 'z' || let >= 'A' && let <= 'Z' {
         pos--
         goto KeyName1
     }
     if let == '}' {
-        if cur.parent != nil {
-            cur = cur.parent
-            //fmt.Printf("Ascend to type %d\n", cur.NodeType)
-            if cur.NodeType == TYPE_ARR {
-            	goto AfterColon
-            }
-            goto Hash
-        } else {
-            remainder = data[pos:]
-            goto Done
+        parent, parentType := cur.Parent()
+        if Debug { fmt.Printf("Ascend to type %d\n", parentType) }
+        if parent != nil {
+            cur = parent
+            nodeType = parentType
+            goto HashOrAfterColon
         }
+        remainder = data[pos:]
+        goto Done
     }
     if let == '/' && pos < (size-1) {
+        if pos > endi { goto OverEnd }
         if data[pos] == '/' {
             pos++
             goto HashComment
@@ -315,6 +460,7 @@ Hash:
     }
     goto Hash
 HashComment:
+    if pos > endi { finalState="HashComment"; goto OverEnd }
     let = data[pos]
     pos++
     if let == 0x0d || let == 0x0a {
@@ -322,39 +468,47 @@ HashComment:
     }
     goto HashComment
 HashComment2:
+    if pos > endi { finalState="HashComment2"; goto OverEnd }
     let = data[pos]
     pos++
+    if pos > endi { goto OverEnd }
     if( let == '*' && pos < (size-1) && data[pos] == '/' ) { pos++; goto Hash; }
     goto HashComment2;
+RootHashComment:
+    if pos > endi { finalState="RootHashComment"; goto OverEnd }
+    let = data[pos]
+    pos++
+    if let == 0x0d || let == 0x0a {
+        goto UnknownRoot
+    }
+    goto RootHashComment
+RootHashComment2:
+    if pos > endi { finalState="RootHashComment2"; goto OverEnd }
+    let = data[pos]
+    pos++
+    if pos > endi { goto OverEnd }
+    if( let == '*' && pos < (size-1) && data[pos] == '/' ) { pos++; goto UnknownRoot; }
+    goto RootHashComment2;
 QKeyName1:
     keyStart = pos
     pos++
 QKeyNameX:
+    if pos > endi { finalState="QKeyNameX"; goto OverEnd }
     let = data[pos]
     pos++
-    if let == '\'' {
+    if let == endc {
         key = string( data[ keyStart : pos - 1 ] )
         goto Colon
     }
     goto QKeyNameX
-QQKeyName1:
-    keyStart = pos
-    pos++
-QQKeyNameX:
-    let = data[pos]
-    pos++
-    if let == '"' {
-        key = string( data[ keyStart : pos - 1 ] )
-        goto Colon
-    }
-    goto QQKeyNameX
 KeyName1:
-	//fmt.Printf("KeyName1 %c %d\n", let, let )
+	//if Debug { fmt.Printf("KeyName1 %c %d\n", let, let ) }
     keyStart = pos
     pos++
 KeyNameX:
+    if pos > endi { finalState="KeyNameX"; goto OverEnd }
     let = data[pos]
-    //fmt.Printf("KeyNameX %c %d\n", let, let )
+    if Debug { fmt.Printf("KeyNameX %c %d\n", let, let ) }
     pos++
     if let == ':' {
         key = string( data[ keyStart : pos - 1 ] )
@@ -366,6 +520,7 @@ KeyNameX:
     }
     goto KeyNameX
 Colon:
+    if pos > endi { finalState="Colon"; goto OverEnd }
     let = data[pos]
     pos++
     if let == ':' {
@@ -373,32 +528,34 @@ Colon:
     }
     goto Colon
 AfterColon:
+    if pos > endi { finalState="AfterColon"; goto OverEnd }
     let = data[pos]
-    //if let != ' ' && let != '\n' { fmt.Printf("AfterColon %c %d\n", let, let ) }
+    if Debug { if let != ' ' && let != '\n' { fmt.Printf("AfterColon %c %d\n", let, let ) } }
     pos++
     if let == '"' {
+        endc = '"'
         goto String1
     }
     if let == '\'' {
-        goto SQString1
+        endc = '\''
+        goto String1
+    }
+    if let == '`' {
+        endc = '`'
+        goto String1
     }
     if let == '{' {
-        newJNode := &JNode{ NodeType: TYPE_HASH, hash: NewNodeHash() }
-        newJNode.parent = cur;
-        if cur.NodeType == TYPE_HASH {
-            cur.hash[ key ] = newJNode
-        }
-        if cur.NodeType == TYPE_ARR {
-            cur.add_item( newJNode )
-        }
+        newJNode := NewJHash( cur )
+        cur.Add( key, newJNode )
         cur = newJNode
+        nodeType = TYPE_HASH
         goto Hash
     }
     if let >= 'a' && let <= 'z' {
         typeStart = pos - 1
         goto TypeX
     }
-    if let == '/' && pos < (size-1) {
+    if let == '/' && pos < endi {
         if data[pos] == '/' {
             pos++
             goto AC_Comment
@@ -419,30 +576,25 @@ AfterColon:
         goto Number1
     }
     if let == '[' {
-        newArr := NewNodeArr()
-        newArr.count = 0
-        newArr.hash["parent"] = cur
-        if cur.NodeType == TYPE_HASH {
-            cur.hash[ key ] = newArr
-        }
-        if cur.NodeType == TYPE_ARR {
-            cur.add_item( newArr )
-        }
+        newArr := NewJArr( cur )
+        cur.Add( key, newArr )
         cur = newArr
+        nodeType = TYPE_ARR
         goto AfterColon
     }
     if let == ']' {
-        array := cur
-        cur = array.hash["parent"] // the original parent
-        array.parent = array.hash["first"]
-        delete( array.hash, "parent" )
-        delete( array.hash, "first" )
-        if cur.NodeType == TYPE_ARR { goto AfterColon }
-        if cur.NodeType == TYPE_HASH { goto Hash }
-        // should never reach here
+        cur, nodeType = cur.Parent()
+        if cur == nil {
+            if pos <= endi {
+                remainder = data[pos:]
+            }
+            goto Done
+        }
+        goto HashOrAfterColon
     }
-    goto AfterColon;
+    goto AfterColon
 TypeX:
+    if pos > endi { finalState="TypeX"; goto OverEnd }
     let = data[pos]
     pos++
     if ( let >= '0' && let <= '9' ) || ( let >= 'a' && let <= 'z' ) { goto TypeX }
@@ -450,23 +602,19 @@ TypeX:
     typeWord = string( data[ typeStart : pos ] )
     handler = handlers[ typeWord ]
     if handler == nil {
-        fmt.Printf("unknown type '%s'\n", typeWord )
-        os.Exit(1)
+        errText := fmt.Sprintf("unknown type '%s'", typeWord )
+        return root,remainder,&ParseError{ text:errText }
     }
     dest, node = handler( data, pos )
     if dest == 0 {
-        if cur.NodeType == TYPE_HASH {
-            cur.hash[ key ] = node
-            goto Hash
-        } else if cur.NodeType == TYPE_ARR {
-            cur.add_item( node )
-            goto AfterColon
-        }
+        cur.Add( key, node )
+        goto HashOrAfterColon
     }
     fmt.Printf("unknown dest\n")
     os.Exit(1)
     goto TypeX
 AC_Comment:
+    if pos > endi { finalState="AC_Comment"; goto OverEnd }
     let = data[pos]
     pos++
     if let == 0x0d || let == 0x0a {
@@ -474,8 +622,10 @@ AC_Comment:
     }
     goto AC_Comment
 AC_Comment2:
+    if pos > endi { finalState="AC_Comment2"; goto OverEnd }
     let = data[pos]
     pos++
+    if pos > endi { goto OverEnd }
     if let == '*' && pos < (size-1) && data[pos] == '/' {
         pos++
         goto Hash
@@ -484,104 +634,84 @@ AC_Comment2:
 Number1:
     strStart = pos - 1
 NumberX:
+    if pos > endi { finalState="NumberX"; goto OverEnd }
     let = data[pos]
     pos++
     //if( let == '.' ) goto AfterDot;
     if let < '0' || let > '9' {
         str := string( data[ strStart : pos - 1 ] )
-        newJNode := JNode{ str: &str }
+        newJNode := JVal{ str: str }
         if neg {
             newJNode.NodeType = TYPE_NEG
         } else {
             newJNode.NodeType = TYPE_POS
         }
-        if cur.NodeType == 1 {
-            cur.hash[ key ] = &newJNode
-            pos--
-            goto Hash
-        }
-        if cur.NodeType == TYPE_ARR {
-            cur.add_item( &newJNode )
-            pos-- // so that ] gets recognized
-            goto AfterColon
-        }
+        cur.Add( key, &newJNode )
+        pos-- // so that ] gets recognized
+        goto HashOrAfterColon
     }
     goto NumberX;
-SQString1:
-    let = data[pos]
-    //fmt.Printf("String1 %c %d\n", let, let )
-    pos++
-    if( let == '\'' ) {
-       empty := ""
-       newJNode := JNode{ NodeType: TYPE_STR, str: &empty } 
-       if cur.NodeType == TYPE_HASH {
-           cur.hash[ key ] = &newJNode
-           goto Hash
-       }
-       if cur.NodeType == TYPE_ARR {
-           cur.add_item( &newJNode )
-           goto AfterColon
-       }
-       goto AfterVal // should be unreachable
-    }
-    strStart = pos - 1
-SQStringX:
-    let = data[pos]
-    //fmt.Printf("StringX %c %d\n", let, let )
-    pos++
-    if let == '\'' {
-       str := string( data[ strStart : pos - 1 ] )
-       newJNode := &JNode{ NodeType: TYPE_STR, str: &str }
-       if cur.NodeType == TYPE_HASH {
-           cur.hash[ key ] = newJNode
-           goto Hash
-       }
-       if cur.NodeType == TYPE_ARR {
-           cur.add_item( newJNode )
-           goto AfterColon
-       }
-       goto AfterVal // should be unreachable
-    }
-    goto SQStringX;
 String1:
+    if pos > endi { finalState="String1"; goto OverEnd }
     let = data[pos]
-    //fmt.Printf("String1 %c %d\n", let, let )
+    if Debug { fmt.Printf("String1 %c %d\n", let, let ) }
+    str = ""
+    substrStart = pos
     pos++
-    if( let == '"' ) {
-       empty := ""
-       newJNode := JNode{ NodeType: TYPE_STR, str: &empty } 
-       if cur.NodeType == TYPE_HASH {
-           cur.hash[ key ] = &newJNode
-           goto Hash
-       }
-       if cur.NodeType == TYPE_ARR {
-           cur.add_item( &newJNode )
-           goto AfterColon
-       }
-       goto AfterVal // should be unreachable
+    if let == endc {
+        newJNode := JVal{ NodeType: TYPE_STR, str: str } 
+        cur.Add( key, &newJNode )
+        goto HashOrAfterColon
+    }
+    if let == '\\' {
+        goto Escape
     }
     strStart = pos - 1
 StringX:
+    if pos > endi { finalState="StringX"; goto OverEnd }
     let = data[pos]
-    //fmt.Printf("StringX %c %d\n", let, let )
+    if Debug { fmt.Printf("StringX %c %d\n", let, let ) }
     pos++
-    if let == '"' {
-       str := string( data[ strStart : pos - 1 ] )
-       newJNode := &JNode{ NodeType: TYPE_STR, str: &str }
-       if cur.NodeType == TYPE_HASH {
-           cur.hash[ key ] = newJNode
-           goto Hash
-       }
-       if cur.NodeType == TYPE_ARR {
-           cur.add_item( newJNode )
-           goto AfterColon
-       }
-       goto AfterVal // should be unreachable
+    if let == endc {
+        //str := string( data[ strStart : pos - 1 ] )
+        str = str + string( data[ substrStart : pos - 1 ] )
+        newJNode := &JVal{ NodeType: TYPE_STR, str: str }
+        cur.Add( key, newJNode )
+        goto HashOrAfterColon
     }
-    goto StringX;
-AfterVal:
+    if let == '\\' {
+        goto Escape
+    }
+    goto StringX
+Escape:
+    if pos > endi { finalState="Escape"; goto OverEnd }
+    let = data[pos]
+    if let == endc {
+        str = str + string( data[ substrStart : pos - 1 ] ) + string(endc)
+        pos++
+        substrStart = pos
+        goto StringX
+    }
+    if let == '\\' {
+        pos++
+        str = str + string( data[ substrStart : pos - 1 ] ) + "\\"
+        substrStart = pos
+        goto StringX
+    }
+    pos++
+    //str = str + "\\"
+    goto StringX
+HashOrAfterColon:
+    if Debug { fmt.Printf("HashOrAfterColon; type=%d\n", nodeType ) }
+    if nodeType == TYPE_HASH { goto Hash }
+    //if nodeType == TYPE_ARR {
+    goto AfterColon
+    //}
+//AfterVal:
     // who cares about commas in between things; we can just ignore them :D
-    goto Hash
+    //goto Hash
+OverEnd:
+    return root, remainder, &ParseError{ text:"JSON Incomplete", state:finalState }
 Done:
-    return root, remainder
+    return root, remainder, err
 }
