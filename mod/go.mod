@@ -1,4 +1,4 @@
-module github.com/nanoscopic/ujsonin
+module github.com/nanoscopic/ujsonin/v2
 
 go 1.13
 
