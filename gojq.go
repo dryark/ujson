@@ -27,6 +27,23 @@ func runGet( cmd *uc.Cmd ) {
     fmt.Println( node.String() )
 }
 
+func runSet( cmd *uc.Cmd ) {
+    filePath := cmd.Get("-file").String()
+    _, err := os.Stat( filePath )
+    var root uj.JNode
+    if err != nil {
+        root = uj.NewJHash(nil)
+    } else {
+        root, _ = readFile( filePath )
+    }
+    
+    strNode := uj.NewString( cmd.Get("-val").String() )
+    root.Add( cmd.Get("-path").String(), strNode )
+    content := root.DumpSave()
+    
+    ioutil.WriteFile( filePath, []byte(content), 0644 )
+}
+
 func makevarsRecurse( res *string, name string, node uj.JNode ) {
     nType := node.Type()
     switch nType {
@@ -128,6 +145,7 @@ func runPretty( cmd *uc.Cmd ) {
         root.Json()
     } else {
         root.Dump()
+        //fmt.Printf("%s", root.DumpSave())
     }
 }
 
@@ -136,6 +154,11 @@ func main() {
     uclop.AddCmd( "get", "Get value from file", runGet, uc.OPTS{
         uc.OPT("-file","JSON file",uc.REQ),
         uc.OPT("-path","Path in JSON to value",uc.REQ),
+    } )
+    uclop.AddCmd( "set", "Set value in JSON file", runSet, uc.OPTS{
+        uc.OPT("-file","JSON file",uc.REQ),
+        uc.OPT("-path","Path in JSON to set",uc.REQ),
+        uc.OPT("-val","Value to set to",uc.REQ),
     } )
     uclop.AddCmd( "makevars", "Turn JSON into include file for Makefiles", runMakevars, uc.OPTS{
         uc.OPT("-prefix","Prefix for vars",uc.REQ),

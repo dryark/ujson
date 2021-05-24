@@ -33,8 +33,10 @@ type JNode interface {
     ForEach( handler func( JNode ) )
     ForEachKeyed( handler func( string, JNode ) )
     Dump()
+    DumpSave() string
     Json()
     DumpInternal( depth int, json bool )
+    DumpInternalSave( depth int, json bool ) string
     Add( key string, node JNode )
 }
 
@@ -223,6 +225,48 @@ func (self *JHash) DumpInternal( depth int, json bool ) {
     fmt.Printf("\n%s}",strings.Repeat("  ",depth))
 }
 
+func (self *JHash) DumpInternalSave( depth int, json bool ) string {
+    out := "{\n"
+    
+    keyNum := 0
+    for key, val := range self.hash {
+        if keyNum > 0 {
+            if json {
+                out += ",\n"
+            } else {
+                out += "\n"
+            }
+        }
+        basicKey := true
+        l := key[0]
+        if ( ( l < 'a' && l > 'z' ) || ( l < 'A' && l > 'Z' ) ) {
+            basicKey = false
+        } else {
+            for i := 1; i < len(key); i++ {
+                l = key[i]
+                if        l >= 'a' && l <= 'z' {
+                } else if l >= 'A' && l <= 'Z' {
+                } else if l >= '0' && l <= '9' {
+                } else {
+                    basicKey = false
+                }
+            }
+        }
+        if !json && basicKey {
+            out += fmt.Sprintf("%s%s:",strings.Repeat("  ",depth), key)
+        } else {
+            out += fmt.Sprintf("%s\"%s\":",strings.Repeat("  ",depth+1), key)
+        }
+        out += val.DumpInternalSave( depth+1, json )
+        keyNum++
+    }
+    depth--;
+    out += "\n"
+    out += strings.Repeat("  ",depth)
+    out += "}"
+    return out
+}
+
 //func ( self *JHash ) ForEach( _ func( JNode ) ) {}
 func ( self *JVal ) ForEach( _ func( JNode ) ) {}
 
@@ -260,9 +304,36 @@ func ( self *JArr ) DumpInternal( depth int, json bool ) {
     fmt.Printf("\n%s]",strings.Repeat("  ",depth-1))
 }
 
+func ( self *JArr ) DumpInternalSave( depth int, json bool ) string {
+    out := "[\n"
+    
+    i := 0
+    maxi := len( self.arr ) - 1
+    for _, el := range self.arr {
+        fmt.Printf( strings.Repeat("  ",depth) )
+        out += el.DumpInternalSave( depth, json )
+        if i != maxi {
+            if json {
+                out += ",\n"
+            } else {
+                out += "\n"
+            }
+        }
+        i++
+    }
+    out += "\n"
+    out += strings.Repeat("  ",depth-1)
+    out += "]"
+    return out
+}
+
 func ( self *JHash ) Dump() { self.DumpInternal( 1, false ) }
 func ( self *JArr  ) Dump() { self.DumpInternal( 1, false ) }
 func ( self *JVal  ) Dump() { self.DumpInternal( 1, false ) }
+
+func ( self *JHash ) DumpSave() string { return self.DumpInternalSave( 1, false ) }
+func ( self *JArr  ) DumpSave() string { return self.DumpInternalSave( 1, false ) }
+func ( self *JVal  ) DumpSave() string { return self.DumpInternalSave( 1, false ) }
 
 func ( self *JHash ) Json() { self.DumpInternal( 1, true ) }
 func ( self *JArr  ) Json() { self.DumpInternal( 1, true ) }
@@ -286,6 +357,25 @@ func ( self *JVal ) DumpInternal( depth int, json bool ) {
     }
 }
 
+func ( self *JVal ) DumpInternalSave( depth int, json bool ) string {
+    if self.NodeType == TYPE_STR {
+        //out := strings.ReplaceAll( self.str, "\\", "\\\\" )
+        out := strings.ReplaceAll( self.str, "\"", "\\\"" )
+        return fmt.Sprintf("\"%s\"", out )
+    } else if self.NodeType == TYPE_POS { // positive number
+        return self.str
+    } else if self.NodeType == TYPE_NEG { // negative number
+        return fmt.Sprintf("-%s", self.str )
+    } else if self.NodeType == TYPE_TRUE {
+        return fmt.Sprintf("true")
+    } else if self.NodeType == TYPE_FALSE {
+        return fmt.Sprintf("false")
+    } else if self.NodeType == TYPE_NULL {
+        return fmt.Sprintf("null")
+    }
+    return ""
+}
+
 var handlers map[string] func( []byte, int ) ( int, JNode ) = make( map[string] func( []byte, int ) ( int, JNode ) )
 
 func add_handler( name string, handler func( []byte, int ) ( int, JNode ) ) {
@@ -302,6 +392,18 @@ func handle_false( data []byte, pos int ) ( int, JNode ) {
 
 func handle_null( data []byte, pos int ) ( int, JNode ) {
     return 0, &JVal{ NodeType: TYPE_NULL }
+}
+
+func NewBool( val bool ) JNode {
+    if val {
+        return &JVal{ NodeType: TYPE_TRUE }
+    } else {
+        return &JVal{ NodeType: TYPE_FALSE }
+    }
+}
+
+func NewString( str string ) JNode {
+    return &JVal{ NodeType: TYPE_STR, str: str }
 }
 
 func init() {
