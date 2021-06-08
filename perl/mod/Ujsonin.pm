@@ -25,20 +25,35 @@ sub init {
 
 sub parse {
     my ( $data, $beginState ) = @_;
-    my $pos = 1;
+    my $pos = 0;
     my $endstate = 0;
     my $neg = 0;
     my ( $keyLen,$typeStart,$keyStart,$strStart,$let,@stack );
     my $root = { _type => 1 };
     my $cur = $root;
     my $len = length( $data );
+Begin:
+    goto Done if( $pos >= $len );
+    $let = substr( $data, $pos++, 1 );
+    #print "Let: $let\n";
+    if( $let eq '{' ) { goto Hash; }
+    if( $let eq '[' ) {
+        #print "Starting with array\n";
+        $root = $cur = { _parent => undef, _type => 3, arr => [] };
+        goto AfterColon;
+    }
+    goto Begin;
 Hash:
     goto Done if( $pos >= $len );
     $let = substr( $data, $pos++, 1 );
     if( $let eq '"' ) { goto QQKeyName1; }
     if( $let eq '\'' ) { goto QKeyName1; }
     if( ord($let) >= ord('a') && ord($let) <= ord('z') ) { $pos--; goto KeyName1; }
-    if( $let eq '}' && $cur->{_parent} ) { $cur = $cur->{_parent}; }
+    if( $let eq '}' && $cur->{_parent} ) {
+        $cur = $cur->{_parent};
+        if( $cur->{_type} == 3 ) { goto AfterColon; }
+        goto Hash;
+    }
     if( $let eq '/' && $pos < ($len-1) ) {
         if( substr( $data, $pos, 1 ) eq '/' ) { $pos++; goto HashComment; }
         if( substr( $data, $pos, 1 ) eq '*' ) { $pos++; goto HashComment2; }
@@ -106,8 +121,8 @@ AfterColon:
     $let = substr( $data, $pos++, 1 );
     if( $let eq '"' ) { goto String1; }
     if( $let eq '{' ) {
-        my $newHash = { _type => 1 };
-        $newHash->{_parent} = $cur;
+        my $newHash = { _type => 1, _parent => $cur };
+        #$newHash->{_parent} = $cur;
         if( $cur->{_type} == 1 ) { $cur->{ substr( $data, $keyStart, $keyLen ) } = $newHash; }
         if( $cur->{_type} == 3 ) { push( @{$cur->{arr}}, $newHash ); }
         $cur = $newHash;
@@ -135,6 +150,7 @@ AfterColon:
     }
     if( $let eq ']' ) {
         $cur = pop( @stack ); #$cur->{_parent};
+        if( !$cur ) { goto Done; }
         if( $cur->{_type} == 3 ) { goto AfterColon; }
         if( $cur->{_type} == 1 ) { goto Hash; }
         # should never reach here
