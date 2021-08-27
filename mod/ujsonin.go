@@ -35,6 +35,7 @@ type JNode interface {
     Dump()
     DumpSave() string
     Json()
+    JsonSave() string
     DumpInternal( depth int, json bool )
     DumpInternalSave( depth int, json bool ) string
     Add( key string, node JNode )
@@ -338,6 +339,10 @@ func ( self *JVal  ) DumpSave() string { return self.DumpInternalSave( 1, false 
 func ( self *JHash ) Json() { self.DumpInternal( 1, true ) }
 func ( self *JArr  ) Json() { self.DumpInternal( 1, true ) }
 func ( self *JVal  ) Json() { self.DumpInternal( 1, true ) }
+
+func ( self *JHash ) JsonSave() string { return self.DumpInternalSave( 1, true ) }
+func ( self *JArr  ) JsonSave() string { return self.DumpInternalSave( 1, true ) }
+func ( self *JVal  ) JsonSave() string { return self.DumpInternalSave( 1, true ) }
 
 func ( self *JVal ) DumpInternal( depth int, json bool ) {
     if self.NodeType == TYPE_STR {
