@@ -20,7 +20,7 @@ typedef struct node_hash_s { NODEBASE
 } node_hash;
 
 typedef struct node_str_s { NODEBASE
-    char *str;
+    const char *str;
     int len;
     char alloc;
 } node_str;
@@ -40,11 +40,11 @@ node_hash *parse_file( const char *filename, int *err );
 
 node_hash *node_hash__new();
 void node_hash__delete( node_hash *node );
-jnode *node_hash__get( node_hash *self, char *key, int keyLen );
-void node_hash__store( node_hash *self, char *key, int keyLen, jnode *node );
+jnode *node_hash__get( node_hash *self, const char *key, int keyLen );
+void node_hash__store( node_hash *self, const char *key, int keyLen, jnode *node );
 
-node_str *node_str__new( char *str, int len, char type );
-node_str *node_str__new_from_json( char *str, int len );
+node_str *node_str__new( const char *str, int len, char type );
+node_str *node_str__new_from_json( const char *str, int len );
 
 node_arr *node_arr__new();
 void node_arr__add( node_arr *self, jnode *el );

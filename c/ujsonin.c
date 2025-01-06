@@ -72,7 +72,7 @@ node_hash *node_hash__new() {
     return self;
 }
 
-node_str *node_str__new( char *str, int len, char type ) {
+node_str *node_str__new( const char *str, int len, char type ) {
     node_str *self = ( node_str * ) calloc( sizeof( node_str ), 1 );
     self->type = type; // 2 is str, 4 is number, 5 is a negative number
     self->str = str;
@@ -88,7 +88,7 @@ char hex_to_num( char hex ) {
     return 0;
 }
 
-node_str *node_str__new_from_json( char *str, int len ) {
+node_str *node_str__new_from_json( const char *str, int len ) {
     node_str *self = ( node_str * ) calloc( sizeof( node_str ), 1 );
     
     char *alloc = malloc( len );
@@ -181,7 +181,7 @@ void node_hash__dump( node_hash *self, int depth ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     printf("{\n");
     for( int i=0;i<keys->count;i++ ) {
-        char *key = keys->items[i];
+        const char *key = keys->items[i];
         int len = keys->sizes[i];
         SPACES printf("\"%.*s\":",len,key);
         jnode__dump( node_hash__get( self, key, len ), depth );
@@ -194,7 +194,7 @@ sds node_hash__str( node_hash *self, int depth, sds str ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     str = sdscat( str, "{\n");
     for( int i=0;i<keys->count;i++ ) {
-        char *key = keys->items[i];
+        const char *key = keys->items[i];
         int len = keys->sizes[i];
         str = add_indent( str, depth );
         
@@ -214,7 +214,7 @@ sds node_hash__str( node_hash *self, int depth, sds str ) {
 void node_hash__delete( node_hash *self ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     for( int i=0;i<keys->count;i++ ) {
-        char *key = keys->items[i];
+        const char *key = keys->items[i];
         int len = keys->sizes[i];
         jnode *sub = node_hash__get( self, key, len );
         if( sub->type == 1 ) node_hash__delete( (node_hash *) sub );
@@ -230,7 +230,7 @@ void node_hash__dump_to_makefile( node_hash *self, char *prefix ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     char pref2[ 100 ];
     for( int i=0;i<keys->count;i++ ) {
-        char *key = keys->items[i];
+        const char *key = keys->items[i];
         int len = keys->sizes[i];
         jnode *val = node_hash__get( self, key, len );
         if( val->type != 1 ) printf("%s%.*s := ",prefix?prefix:"",len,key);
@@ -344,11 +344,11 @@ void jnode__dump_env( jnode *self ) {
     printf("\"");
 }
 
-void node_hash__store( node_hash *self, char *key, int keyLen, jnode *node ) {
+void node_hash__store( node_hash *self, const char *key, int keyLen, jnode *node ) {
     string_tree__store_len( self->tree, key, keyLen, (void *) node, 0 );
 }
 
-jnode *node_hash__get( node_hash *self, char *key, int keyLen ) {
+jnode *node_hash__get( node_hash *self, const char *key, int keyLen ) {
     char type;
     return (jnode *) string_tree__get_len( self->tree, key, keyLen, &type );
 }
@@ -414,7 +414,8 @@ node_hash *parse( const char *data, int len, parser_state *beginState, int *err 
     int pos = 1, keyLen, typeStart;
     int endstate = 0;
     uint8_t neg = 0;
-    char *keyStart, *strStart, let;
+    const char *keyStart, *strStart;
+    char let;
     int slashCnt = 0;// \ count in a string
     int errIgnore;
     if( !err ) err = &errIgnore;

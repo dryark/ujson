@@ -4,7 +4,7 @@
 #include<string.h>
 #include"red_black_tree.h"
 
-uint32_t fnv1a_len( char *str, int strlen ) {
+uint32_t fnv1a_len( const char *str, int strlen ) {
 	uint32_t hval = 0;
     unsigned char *s = (unsigned char *) str;
 
@@ -18,7 +18,7 @@ uint32_t fnv1a_len( char *str, int strlen ) {
     return hval;
 }
 
-void string_tree__delkey_len( string_tree *self, char *key, int keylen ) {
+void string_tree__delkey_len( string_tree *self, const char *key, int keylen ) {
 	uint32_t hash = fnv1a_len( key, keylen );
 	rb_red_blk_node* rbnode = RBExactQuery( (rb_red_blk_tree *) self->tree, &hash );
 	
@@ -67,7 +67,7 @@ void string_tree__delete( string_tree *self ) {
 	free( self );
 }
 
-void *string_tree__get_len( string_tree *self, char *key, int keylen, char *dataType ) {
+void *string_tree__get_len( string_tree *self, const char *key, int keylen, char *dataType ) {
 	//printf("Getting %s\n", key );
 	snode *node = string_tree__rawget_len( self, key, keylen );
 	if( !node ) {
@@ -78,7 +78,7 @@ void *string_tree__get_len( string_tree *self, char *key, int keylen, char *data
 	return node->data;
 }
 
-snode *string_tree__rawget_len( string_tree *self, char *key, int keylen ) {
+snode *string_tree__rawget_len( string_tree *self, const char *key, int keylen ) {
 	//printf("Attempting to get node %s\n", key );
 	uint32_t hash = fnv1a_len( key, keylen );
 	rb_red_blk_node* rbnode = RBExactQuery( (rb_red_blk_tree *) self->tree, &hash );
@@ -101,7 +101,7 @@ snode *string_tree__rawget_len( string_tree *self, char *key, int keylen ) {
 	return NULL;
 }
 
-void string_tree__store_len( string_tree *self, char *key, int keylen, void *node, char dataType ) {
+void string_tree__store_len( string_tree *self, const char *key, int keylen, void *node, char dataType ) {
 	uint32_t hash = fnv1a_len( key, keylen );
 	snode *curnode = string_tree__rawget_len( self, key, keylen );
 	if( curnode ) {
@@ -144,7 +144,7 @@ void snode__delete( snode *self ) {
     }
 }
 
-snode *snode__new_len( char *newstr, int nstrlen, void *newdata, char dataType, snode *newnext ) {
+snode *snode__new_len( const char *newstr, int nstrlen, void *newdata, char dataType, snode *newnext ) {
     snode *self = ( snode * ) malloc( sizeof( snode ) );
 	self->next = newnext;
 	self->str = newstr;
@@ -163,7 +163,7 @@ xjr_arr *xjr_arr__new() {
 }
 
 void xjr_arr__double( xjr_arr *self) {
-    void **olditems = self->items;
+    const void **olditems = self->items;
     int max = self->max * 2;
     self->items = malloc( sizeof( void * ) * max );
     memcpy( self->items, olditems, sizeof( void * ) * self->max );

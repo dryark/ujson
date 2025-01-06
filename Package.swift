@@ -7,7 +7,9 @@ let package = Package(
         // Products define the executables and libraries a package produces, and make them visible to other packages.
         .library(
             name: "ujsonin",
-            targets: ["ujsonin"]),
+            type: .static,
+            targets: ["ujsonin","stringtree","redblacktree","sds"]
+        ),
     ],
     dependencies: [],
     targets: [
@@ -15,11 +17,31 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "ujsonin",
-            dependencies: [],
+            dependencies: [],//["stringtree","redblacktree","sds"],
             path: "c",
             exclude: ["test.c"],
+            sources: ["ujsonin.c"],
             publicHeadersPath: "."
         ),
+        
+        .target(
+            name: "stringtree",
+            dependencies: [],
+            path: "c",
+            sources: ["string-tree.c"]
+        ),
+        .target(
+            name: "redblacktree",
+            dependencies: [],
+            path: "c",
+            sources: ["red_black_tree.c"]
+        ),
+        .target(
+            name: "sds",
+            dependencies: [],
+            path: "c",
+            sources: ["sds.c"]
+        )
         //.testTarget(
         //    name: "YourLibraryNameTests",
         //    dependencies: ["YourLibraryName"]),
