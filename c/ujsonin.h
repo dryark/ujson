@@ -39,6 +39,7 @@ node_hash *parse( const char *data, int len, parser_state *beginState, int *err 
 node_hash *parse_file( const char *filename, int *err );
 
 node_hash *node_hash__new();
+void node_hash__delete( node_hash *node );
 jnode *node_hash__get( node_hash *self, char *key, int keyLen );
 void node_hash__store( node_hash *self, char *key, int keyLen, jnode *node );
 
