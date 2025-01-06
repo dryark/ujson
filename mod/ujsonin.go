@@ -130,10 +130,18 @@ func ( self *JArr ) Bool() (bool) { return false }
 func ( self *JArr ) ForEachKeyed( handler func( string, JNode ) ) {}
 
 func ( self JVal ) String() (string) {
+    if( self.NodeType == TYPE_NEG ) {
+        return "-" + self.str
+    }
+    
     return self.str
 }
 
 func ( self JVal ) StringEscaped() (string) {
+    if( self.NodeType == TYPE_NEG ) {
+        return "-" + self.str
+    }
+    
     str := []rune(self.str)
     escaped := ""
     for i:=0; i<len(str); i++ {
