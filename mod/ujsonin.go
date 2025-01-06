@@ -27,6 +27,7 @@ type JNode interface {
     Overlay( ontop JNode )
     
     String() string
+    StringEscaped() string
     Bool() bool
     Int() int
     
@@ -119,15 +120,40 @@ func ( self *JHash ) Overlay( ontop JNode ) {
 }
 
 func ( self *JHash ) String() (string) { return "" }
+func ( self *JHash ) StringEscaped() (string) { return "" }
 func ( self *JHash ) Bool() (bool) { return false }
 func ( self *JHash ) ForEach( handler func( JNode ) ) {}
 
 func ( self *JArr ) String() (string) { return "" }
+func ( self *JArr ) StringEscaped() (string) { return "" }
 func ( self *JArr ) Bool() (bool) { return false }
 func ( self *JArr ) ForEachKeyed( handler func( string, JNode ) ) {}
 
 func ( self JVal ) String() (string) {
     return self.str
+}
+
+func ( self JVal ) StringEscaped() (string) {
+    str := []rune(self.str)
+    escaped := ""
+    for i:=0; i<len(str); i++ {
+        let := str[i]
+        if let == '\\' {
+            i++
+            let = str[i]
+            if let != 'u' {
+                escaped += string(let)
+                continue
+            }
+            numStr := str[i+1:i+5]
+            num, _ := strconv.ParseInt( string(numStr), 16, 32 )
+            escaped += string( rune( num ) )
+            i += 4
+            continue
+        }
+        escaped += string(let)
+    }
+    return escaped
 }
 
 func ( self JVal ) Bool() (bool) {
