@@ -1,4 +1,4 @@
-#include "ujsonin.h"
+#include"ujsonin.h"
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -78,7 +78,7 @@ int main( int argc, char *argv[] ) {
             node_hash *curhash = ( node_hash * ) cur;
             cur = node_hash__get( curhash, part, strlen( part ) );
         }
-        jnode__dump_env( cur );
+        //jnode__dump_env( cur );
         exit(0);
     }
     if( !strncmp(cmd,"test",4) ) {
