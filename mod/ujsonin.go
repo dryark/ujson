@@ -26,6 +26,8 @@ type JNode interface {
     Type() uint8
     Get( key string ) JNode
     GetAt( pos int ) JNode
+    GetArr() []JNode
+    SetArr( []JNode )
     Overlay( ontop JNode )
     
     String() string
@@ -100,18 +102,45 @@ func ( self *JHash ) Get( key string ) JNode {
     return self.hash[ key ]
 }
 
+func ( self *JHash ) GetArr() ([]JNode) { return nil }
+func ( self *JVal ) GetArr() ([]JNode) { return nil }
+func ( self *JArr ) GetArr() ([]JNode) {
+    return self.arr
+}
+func ( self *JHash ) SetArr( []JNode ) {}
+func ( self *JVal ) SetArr( []JNode ) {}
+func ( self *JArr ) SetArr( newArr []JNode ) {
+    self.arr = newArr
+}
+
 func ( self *JArr ) Overlay( _ JNode )  {}
 func ( self *JVal ) Overlay( _ JNode )  {}
 
 func ( self *JHash ) Overlay( ontop JNode ) {
     ontop.ForEachKeyed( func( key string, ontopVal JNode ) {
-        val := self.Get( key )
+        curVal := self.Get( key )
         ontopType := ontopVal.Type()
+        curType := uint8(0)
+        if curVal != nil {
+            curType = curVal.Type()
+        }
         if ontopType == TYPE_HASH {
-            if val == nil {
+            if curVal == nil {
                 self.Add( key, ontopVal )
+            } else if curType == TYPE_HASH {
+                curVal.Overlay( ontopVal )
             } else {
-                val.Overlay( ontopVal )
+                self.Add( key, ontopVal )
+            }
+        } else if ontopType == TYPE_ARR {
+            if curVal == nil {
+                self.Add( key, ontopVal )
+            } else if curType == TYPE_ARR {
+                arr := self.GetArr()
+                addArr := ontopVal.GetArr()
+                self.SetArr( append( arr, addArr... ) )
+            } else {
+                self.Add( key, ontopVal )
             }
         } else {
             //if !valOk || ontopType != TYPE_HASH {
