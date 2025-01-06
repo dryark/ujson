@@ -365,21 +365,21 @@ handle_res *handle_res__new() {
     return self;
 }
 
-handle_res *handle_true( char *data, int *pos ) {
+handle_res *handle_true( const char *data, int *pos ) {
     jnode *node = jnode__new( 6 );
     handle_res *res = handle_res__new();
     res->node = node;
     return res;
 }
 
-handle_res *handle_false( char *data, int *pos ) {
+handle_res *handle_false( const char *data, int *pos ) {
     jnode *node = jnode__new( 7 );
     handle_res *res = handle_res__new();
     res->node = node;
     return res;
 }
 
-handle_res *handle_null( char *data, int *pos ) {
+handle_res *handle_null( const char *data, int *pos ) {
     jnode *node = jnode__new( 8 );
     handle_res *res = handle_res__new();
     res->node = node;
@@ -390,7 +390,7 @@ jnode *node_null__new() {
     return jnode__new( 8 );
 }
 
-typedef handle_res* (*ahandler)(char *, int * ); 
+typedef handle_res* (*ahandler)(const char *, int * ); 
 
 string_tree *handlers;
 void ujsonin_init() {
@@ -410,7 +410,7 @@ node_hash *parse_file( const char *filename, int *err ) {
     return parse( data, len, NULL, err );
 }
 
-node_hash *parse( char *data, int len, parser_state *beginState, int *err ) {
+node_hash *parse( const char *data, int len, parser_state *beginState, int *err ) {
     int pos = 1, keyLen, typeStart;
     int endstate = 0;
     uint8_t neg = 0;
@@ -520,11 +520,11 @@ AfterColon: SAFEGET(10)
         typeStart = pos - 1;
         goto TypeX;
     }
-    if( let >= 'A' && let <= 'Z' ) {
+    /*if( let >= 'A' && let <= 'Z' ) {
         data[pos-1] = let - 'A' + 'a';
         typeStart = pos - 1;
         goto TypeX;
-    }
+    }*/
     
     if( let == '/' && pos < (len-1) ) {
         if( data[pos] == '/' ) { pos++; goto AC_Comment; }
@@ -550,10 +550,10 @@ AfterColon: SAFEGET(10)
     goto AfterColon;
 TypeX: SAFEGET(11)
     if( ( let >= '0' && let <= 9 ) || ( let >= 'a' && let <= 'z' ) ) goto TypeX;
-    if( let >= 'A' && let <= 'Z' ) {
+    /*if( let >= 'A' && let <= 'Z' ) {
         data[pos-1] = let - 'A' + 'a';
         goto TypeX;
-    }
+    }*/
     pos--; // go back a character; we've encountered a non-type character
     // Type name is done
     int typeLen = pos - typeStart; 

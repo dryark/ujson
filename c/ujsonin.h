@@ -35,7 +35,7 @@ typedef struct parser_state_s {
     int state;
 } parser_state;
 
-node_hash *parse( char *data, int len, parser_state *beginState, int *err );
+node_hash *parse( const char *data, int len, parser_state *beginState, int *err );
 node_hash *parse_file( const char *filename, int *err );
 
 node_hash *node_hash__new();
