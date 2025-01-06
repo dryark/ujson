@@ -108,19 +108,19 @@ static inline size_t sdsavail(const sds s) {
             return 0;
         }
         case SDS_TYPE_8: {
-            SDS_HDR_VAR(8,s);
+            SDS_HDR_VAR(8,(struct sdshdr8 *)s);
             return sh->alloc - sh->len;
         }
         case SDS_TYPE_16: {
-            SDS_HDR_VAR(16,s);
+            SDS_HDR_VAR(16,(struct sdshdr16 *)s);
             return sh->alloc - sh->len;
         }
         case SDS_TYPE_32: {
-            SDS_HDR_VAR(32,s);
+            SDS_HDR_VAR(32,(struct sdshdr32 *)s);
             return sh->alloc - sh->len;
         }
         case SDS_TYPE_64: {
-            SDS_HDR_VAR(64,s);
+            SDS_HDR_VAR(64,(struct sdshdr64 *)s);
             return sh->alloc - sh->len;
         }
     }
