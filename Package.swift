@@ -17,8 +17,8 @@ let package = Package(
             name: "ujsonin",
             dependencies: [],
             path: "c",
-            publicHeadersPath: ".",
-            exclude: ["test.c"]
+            exclude: ["test.c"],
+            publicHeadersPath: "."
         ),
         //.testTarget(
         //    name: "YourLibraryNameTests",
