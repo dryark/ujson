@@ -2,6 +2,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include"sds.h"
 
 int main( int argc, char *argv[] ) {
     ujsonin_init();
@@ -85,10 +86,17 @@ int main( int argc, char *argv[] ) {
         char *data = slurp_file( "test.json", &len );
         int err;
         node_hash *root = parse( data, len, NULL, &err );
+        
         jnode__dump( (jnode *) root, 0 );
+        
+        sds str = jnode__str( (jnode *) root, 0, 0 );
+        puts( str );
+        sdsfree( str );
+        
         node_hash__delete( root );
         exit(0);   
     }
+    
     fprintf(stderr,"Unknown command '%s'\n", cmd );
     return 1;
 }

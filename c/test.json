@@ -1,0 +1,5 @@
+{
+  blah: 10
+  str: "test"
+  nums: [1,2,3]
+}
