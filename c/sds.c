@@ -110,28 +110,28 @@ sds sdsnewlen(const void *init, size_t initlen) {
             break;
         }
         case SDS_TYPE_8: {
-            SDS_HDR_VAR(8,s);
+            SDS_HDR_VAR(8,(struct sdshdr8 *)s);
             sh->len = initlen;
             sh->alloc = initlen;
             *fp = type;
             break;
         }
         case SDS_TYPE_16: {
-            SDS_HDR_VAR(16,s);
+            SDS_HDR_VAR(16,(struct sdshdr16 *)s);
             sh->len = initlen;
             sh->alloc = initlen;
             *fp = type;
             break;
         }
         case SDS_TYPE_32: {
-            SDS_HDR_VAR(32,s);
+            SDS_HDR_VAR(32,(struct sdshdr32 *)s);
             sh->len = initlen;
             sh->alloc = initlen;
             *fp = type;
             break;
         }
         case SDS_TYPE_64: {
-            SDS_HDR_VAR(64,s);
+            SDS_HDR_VAR(64,(struct sdshdr64 *)s);
             sh->len = initlen;
             sh->alloc = initlen;
             *fp = type;
