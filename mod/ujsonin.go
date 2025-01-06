@@ -17,6 +17,8 @@ const (
     TYPE_TRUE
     TYPE_FALSE
     TYPE_NULL
+    TYPE_FLOAT_POS
+    TYPE_FLOAT_NEG
 )
 
 type JNode interface {
@@ -30,6 +32,7 @@ type JNode interface {
     StringEscaped() string
     Bool() bool
     Int() int
+    Float32() float32
     
     ForEach( handler func( JNode ) )
     ForEachKeyed( handler func( string, JNode ) )
@@ -123,11 +126,15 @@ func ( self *JHash ) String() (string) { return "" }
 func ( self *JHash ) StringEscaped() (string) { return "" }
 func ( self *JHash ) Bool() (bool) { return false }
 func ( self *JHash ) ForEach( handler func( JNode ) ) {}
+func ( self *JHash ) Int() int { return 0 }
+func ( self *JHash ) Float32() (float32) { return 0 }
 
 func ( self *JArr ) String() (string) { return "" }
 func ( self *JArr ) StringEscaped() (string) { return "" }
 func ( self *JArr ) Bool() (bool) { return false }
 func ( self *JArr ) ForEachKeyed( handler func( string, JNode ) ) {}
+func ( self *JArr ) Int() int { return 0 }
+func ( self *JArr ) Float32() (float32) { return 0 }
 
 func ( self JVal ) String() (string) {
     if( self.NodeType == TYPE_NEG ) {
@@ -174,9 +181,6 @@ func ( self JVal ) Bool() (bool) {
     return false
 }
 
-func ( self *JHash ) Int() int { return 0 }
-func ( self *JArr ) Int() int { return 0 }
-
 func ( self *JVal ) Int() (int) {
     if( self.NodeType == TYPE_POS ) {
         i , _ := strconv.Atoi( self.str )
@@ -194,6 +198,33 @@ func ( self *JVal ) Int() (int) {
     }
     i , _ := strconv.Atoi( self.str )
     return i
+}
+
+func ( self *JVal ) Float32() (float32) {
+    if( self.NodeType == TYPE_FLOAT_POS ) {
+        i , _ := strconv.ParseFloat( self.str, 32 )
+        return float32( i );
+    }
+    if( self.NodeType == TYPE_FLOAT_NEG ) {
+        i , _ := strconv.ParseFloat( self.str, 32 )
+        return -float32( i )
+    }
+    if( self.NodeType == TYPE_POS ) {
+        i , _ := strconv.Atoi( self.str )
+        return float32( i );
+    }
+    if( self.NodeType == TYPE_NEG ) {
+        i , _ := strconv.Atoi( self.str )
+        return -float32( i )
+    }
+    if( self.NodeType == TYPE_TRUE ) {
+        return 1
+    }
+    if( self.NodeType == TYPE_FALSE ) {
+        return 0
+    }
+    i , _ := strconv.Atoi( self.str )
+    return float32( i )
 }
 
 func NewJHash( parent JNode ) JNode {
@@ -778,7 +809,7 @@ NumberX:
     if pos > endi { finalState="NumberX"; goto OverEnd }
     let = data[pos]
     pos++
-    //if( let == '.' ) goto AfterDot;
+    if let == '.' { goto AfterDot; }
     if let < '0' || let > '9' {
         str := string( data[ strStart : pos - 1 ] )
         newJNode := JVal{ str: str }
@@ -792,6 +823,23 @@ NumberX:
         goto HashOrAfterColon
     }
     goto NumberX;
+AfterDot:
+    if pos > endi { finalState="AfterDot"; goto OverEnd }
+    let = data[pos]
+    pos++
+    if let < '0' || let > '9' {
+        str := string( data[ strStart : pos - 1 ] )
+        newJNode := JVal{ str: str }
+        if neg {
+            newJNode.NodeType = TYPE_FLOAT_NEG
+        } else {
+            newJNode.NodeType = TYPE_FLOAT_POS
+        }
+        cur.Add( key, &newJNode )
+        pos-- // so that ] gets recognized
+        goto HashOrAfterColon
+    }
+    goto AfterDot;
 String1:
     if pos > endi { finalState="String1"; goto OverEnd }
     let = data[pos]
