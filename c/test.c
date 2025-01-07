@@ -87,11 +87,27 @@ int main( int argc, char *argv[] ) {
         int err;
         node_hash *root = parse( data, len, NULL, &err );
         
+        printf("Dump of node:\n");
         jnode__dump( (jnode *) root, 0 );
+        printf("--\n\n");
         
-        sds str = jnode__str( (jnode *) root, 0, 0 );
-        puts( str );
+        printf("jnode__jsonof node:[");
+        sds str = jnode__json( (jnode *) root, 0, 0 );
+        fputs( str, stdout );
+        printf("]\n");
         sdsfree( str );
+        
+        printf("jnode__asstr of str:[");
+        sds str2 = node_hash__get_str( (node_hash *) root, "str", 3 );
+        fputs( str2, stdout );
+        printf("]\n");
+        sdsfree( str2 );
+        
+        printf("jnode__asstr of str2:[");
+        sds str3 = node_hash__get_str( (node_hash *) root, "str2", 3 );
+        fputs( str3, stdout );
+        printf("]\n");
+        sdsfree( str3 );
         
         node_hash__delete( root );
         exit(0);   

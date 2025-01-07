@@ -145,6 +145,10 @@ node_str *node_str__new_from_json( const char *str, int len ) {
                 alloc[io++] = '"';
                 continue;
             }
+            if( let == '\'' ) {
+                alloc[io++] = '\'';
+                continue;
+            }
             io++;
             continue;
         }
@@ -197,14 +201,8 @@ sds node_hash__str( node_hash *self, int depth, sds str ) {
         const char *key = keys->items[i];
         int len = keys->sizes[i];
         str = add_indent( str, depth );
-        
-        /*str = sdscat( str, "\"" );
-        str = sdscatlen( str, key, len );
-        str = sdscat( str, "\":" );*/
         str = sdscatfmt( str, "\"%p\":", len, key );
-        //str = sdscatfmt( str, "\"%.*s\":", len, key );
-        
-        str = jnode__str( node_hash__get( self, key, len ), depth, str );
+        str = jnode__json( node_hash__get( self, key, len ), depth, str );
     }
     str = add_indent( str, depth-1 );
     str = sdscat( str, "}\n" );
@@ -254,12 +252,12 @@ void node_arr__dump( node_arr *self, int depth ) {
     SPACES printf("]\n");
 }
 
-sds node_arr__str( node_arr *self, int depth, sds str ) {
+sds node_arr__json( node_arr *self, int depth, sds str ) {
     str = sdscat( str, "[\n" );
     jnode *cur = self->head;
     for( int i=0;i<self->count;i++ ) {
         str = add_indent( str, depth );
-        str = jnode__str( cur, depth, str );
+        str = jnode__json( cur, depth, str );
         cur = cur->parent; // parent is being reused as next
     }
     //depth--;
@@ -268,6 +266,16 @@ sds node_arr__str( node_arr *self, int depth, sds str ) {
     return str;
 }
 
+/*
+1
+2 = double quoted string
+3 = array
+4 = positive int
+5 = negative int
+6 = true
+7 = false
+8 = null
+*/
 void jnode__dump( jnode *self, int depth ) {
     if( self->type == 1 ) node_hash__dump( (node_hash *) self, depth+1 );
     else if( self->type == 2 ) printf("\"%.*s\"\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
@@ -279,38 +287,47 @@ void jnode__dump( jnode *self, int depth ) {
     else if( self->type == 8 ) printf("null\n");
 }
 
-sds jnode__str( jnode *self, int depth, sds str ) {
+sds jnode__str( jnode *self ) {
+    sds str = sdsempty();
+    int depth = 0;
+    
+    if( self->type == 1 ) return node_hash__str( (node_hash *) self, depth+1, str );
+    else if( self->type == 2 ) {
+        return sdscatlen( str, ( (node_str *) self )->str, ( (node_str *) self )->len );
+    }
+    else if( self->type == 3 ) return node_arr__json( (node_arr *) self, depth+1, str );
+    else if( self->type == 4 ) {
+        return sdscatlen( str, ( (node_str *) self )->str, ( (node_str *) self )->len );
+    }
+    else if( self->type == 5 ) {
+        str = sdscat( str, "-" );
+        return sdscatlen( str, ( (node_str *) self )->str, ( (node_str *) self )->len );
+    }
+    else if( self->type == 6 ) return sdscat( str, "true");
+    else if( self->type == 7 ) return sdscat( str, "false");
+    else if( self->type == 8 ) return sdscat( str, "null");
+    return str;
+}
+
+sds jnode__json( jnode *self, int depth, sds str ) {
     if( !str ) {
         depth = 0;
         str = sdsempty();
     }
     if( self->type == 1 ) return node_hash__str( (node_hash *) self, depth+1, str );
     else if( self->type == 2 ) {
-        /*str = sdscat( str, "\"");
-        str = sdscatlen( str, ( (node_str *) self )->str, ( (node_str *) self )->len );
-        return sdscat( str, "\"\n" );*/
-        
-        //str = sdscat( str, "\"");
-        //str = sdscatlen( str, ( (node_str *) self )->str, ( (node_str *) self )->len );
         str = sdscatrepr( str, ( (node_str *) self )->str, ( (node_str *) self )->len );
         return sdscat( str, "\n" );
-        //return sdscat( str, "\"\n" );
-        
-        //return sdscatfmt( str, "\"%r\"\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
-        
-        //return sdscatfmt( str, "\"%.*s\"\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
     }
-    else if( self->type == 3 ) return node_arr__str( (node_arr *) self, depth+1, str );
+    else if( self->type == 3 ) return node_arr__json( (node_arr *) self, depth+1, str );
     else if( self->type == 4 ) {
         str = sdscatlen( str, ( (node_str *) self )->str, ( (node_str *) self )->len );
         return sdscat( str, "\n" );
-        //return sdscatfmt( str, "%.*s\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
     }
     else if( self->type == 5 ) {
         str = sdscat( str, "-" );
         str = sdscatlen( str, ( (node_str *) self )->str, ( (node_str *) self )->len );
         return sdscat( str, "\n" );
-        //return sdscatfmt( str, "-%.*s\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
     }
     else if( self->type == 6 ) return sdscat( str, "true\n");
     else if( self->type == 7 ) return sdscat( str, "false\n");
@@ -351,6 +368,12 @@ void node_hash__store( node_hash *self, const char *key, int keyLen, jnode *node
 jnode *node_hash__get( node_hash *self, const char *key, int keyLen ) {
     char type;
     return (jnode *) string_tree__get_len( self->tree, key, keyLen, &type );
+}
+
+sds node_hash__get_str( node_hash *self, const char *key, int keyLen ) {
+    char type;
+    jnode *jnode = string_tree__get_len( self->tree, key, keyLen, &type );
+    return jnode__str( jnode );
 }
 
 char nullStr[2] = { 0, 0 };
@@ -419,6 +442,7 @@ node_hash *parse( const char *data, int len, parser_state *beginState, int *err 
     int slashCnt = 0;// \ count in a string
     int errIgnore;
     if( !err ) err = &errIgnore;
+    char stringType = 0;
     
     node_hash *root = node_hash__new();
     jnode *cur = ( jnode * ) root;
@@ -508,7 +532,14 @@ Colon: SAFEGET(9)
     if( let == ':' ) goto AfterColon;
     goto Colon;
 AfterColon: SAFEGET(10)
-    if( let == '"' ) goto String1;
+    if( let == '"' ) {
+        stringType = 0;
+        goto String1;
+    }
+    if( let == '\'' ) {
+        stringType = 1;
+        goto String1;
+    }
     if( let == '{' ) {
         node_hash *newHash = node_hash__new();
         newHash->parent = cur;
@@ -644,10 +675,23 @@ String1: SAFEGET(17)
         }
         goto AfterVal; // Should never be reached
     }
+    if( let == '\'' ) {
+        jnode *newStr = (jnode *) node_str__new( nullStr, 0, 2 );
+        if( cur->type == 1 ) {
+            node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
+            goto AfterVal;
+        }
+        if( cur->type == 3 ) {
+            node_arr__add( (node_arr *) cur, newStr );
+            goto AfterColon;
+        }
+        goto AfterVal; // Should never be reached
+    }
     strStart = &data[pos-1];
+    goto StringX;
 StringX: SAFEGET(18)
     StringX2:
-    if( let == '"' ) {
+    if( ( !stringType && let == '"' ) || ( stringType && let == '\'' ) ) {
        int strLen = &data[pos-1] - strStart;
        jnode *newStr;
        if( slashCnt ) newStr = (jnode *) node_str__new_from_json( strStart, strLen );
@@ -669,7 +713,7 @@ StringX: SAFEGET(18)
     }
     goto StringX;
 StrSlash1: SAFEGET(21) // hex or "
-    if( let == '"' || let == '\\' ) {
+    if( ( !stringType && let == '"' ) || (stringType && let == '\'' ) || let == '\\' ) {
         goto StringX;
     }
     if( let == 'u' ) {

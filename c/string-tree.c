@@ -185,7 +185,7 @@ xjr_key_arr *xjr_key_arr__new() {
 }
 
 void xjr_key_arr__double( xjr_key_arr *self) {
-    char **olditems = self->items;
+    const char **olditems = self->items;
     void *oldsizes = self->sizes;
     int max = self->max * 2;
     self->items = malloc( sizeof( char * ) * max );

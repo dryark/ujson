@@ -1,7 +1,11 @@
 #ifndef __UJSONIN_H
 #define __UJSONIN_H
 #include"string-tree.h"
+
+// sds is used for strings
+// Anytime you get a sds back, you can treat it like a char*, but you must sdsfree it when done.
 #include"sds.h"
+
 typedef struct jnode_s jnode;
 
 #define NODEBASE char type; jnode *parent;
@@ -41,6 +45,7 @@ node_hash *parse_file( const char *filename, int *err );
 node_hash *node_hash__new();
 void node_hash__delete( node_hash *node );
 jnode *node_hash__get( node_hash *self, const char *key, int keyLen );
+sds node_hash__get_str( node_hash *self, const char *key, int keyLen );
 void node_hash__store( node_hash *self, const char *key, int keyLen, jnode *node );
 
 node_str *node_str__new( const char *str, int len, char type );
@@ -51,8 +56,16 @@ void node_arr__add( node_arr *self, jnode *el );
 
 jnode *node_null__new();
 
+// This is an ugly method to dump the contents of a jnode.
+// The output is not a proper JSON representation. You probably shouldn't use this.
 void jnode__dump( jnode *self, int depth );
-sds jnode__str( jnode *self, int depth, sds str );
+
+// Get the JSON representation of the jnode. If run on a string, will give a proper JSON string surrounded with quotes
+sds jnode__json( jnode *self, int depth, sds str );
+
+// Get the raw value of a string in jnode form
+sds jnode__str( jnode *self ); // str value of node
+
 char *slurp_file( const char *filename, int *outlen );
 void ujsonin_init();
 void jnode__dump_env( jnode *self );

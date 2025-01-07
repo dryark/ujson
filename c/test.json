@@ -1,5 +1,6 @@
 {
   blah: 10
-  str: "test"
+  str: "tes\" 't"
+  str2: 'tes\' "t'
   nums: [1,2,3]
 }
