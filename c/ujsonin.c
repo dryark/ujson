@@ -373,6 +373,7 @@ jnode *node_hash__get( node_hash *self, const char *key, int keyLen ) {
 sds node_hash__get_str( node_hash *self, const char *key, int keyLen ) {
     char type;
     jnode *jnode = string_tree__get_len( self->tree, key, keyLen, &type );
+    if( !jnode ) return 0;
     return jnode__str( jnode );
 }
 
