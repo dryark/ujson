@@ -6,7 +6,7 @@ import (
     "os"
     "time"
     "strconv"
-    uc "github.com/nanoscopic/uclop/v2"
+    uc "github.com/nanoscopic/uclop/go"
     uj "github.com/dryark/ujsonin/go"
 )
 
