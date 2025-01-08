@@ -7,7 +7,7 @@ import (
     "time"
     "strconv"
     uc "github.com/nanoscopic/uclop/mod"
-    uj "github.com/nanoscopic/ujsonin/v2/mod"
+    uj "github.com/dryark/ujsonin/go"
 )
 
 func readFile( path string ) (uj.JNode, *uj.ParseError) {

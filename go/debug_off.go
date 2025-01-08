@@ -1,6 +1,6 @@
 // +build !debug
 
-package mod
+package main
 
 const (
   Debug = false
