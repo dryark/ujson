@@ -1,3 +1,3 @@
-module github.com/dryark/ujsonin/v2/go
+module github.com/dryark/ujsonin/go/v2
 
 go 1.13
