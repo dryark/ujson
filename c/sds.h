@@ -136,6 +136,8 @@ static inline void sdssetlen(sds s, size_t newlen) {
                 *fp = SDS_TYPE_5 | (newlen << SDS_TYPE_BITS);
             }
             break;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
         case SDS_TYPE_8:
             SDS_HDR(8,s)->len = newlen;
             break;
@@ -148,6 +150,7 @@ static inline void sdssetlen(sds s, size_t newlen) {
         case SDS_TYPE_64:
             SDS_HDR(64,s)->len = newlen;
             break;
+#pragma clang diagnostic pop
     }
 }
 
@@ -200,6 +203,8 @@ static inline void sdssetalloc(sds s, size_t newlen) {
         case SDS_TYPE_5:
             /* Nothing to do, this type has no total allocation info. */
             break;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
         case SDS_TYPE_8:
             SDS_HDR(8,s)->alloc = newlen;
             break;
@@ -212,6 +217,7 @@ static inline void sdssetalloc(sds s, size_t newlen) {
         case SDS_TYPE_64:
             SDS_HDR(64,s)->alloc = newlen;
             break;
+#pragma clang diagnostic pop
     }
 }
 
