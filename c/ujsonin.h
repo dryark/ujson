@@ -2,6 +2,8 @@
 #define __UJSONIN_H
 #include"string-tree.h"
 #include"red_black_tree.h"
+#include"sdsalloc.h"
+#include<stdint.h>
 
 #define UJDEBUG
 
@@ -11,7 +13,7 @@
 
 typedef struct jnode_s jnode;
 
-#define NODEBASE char type; jnode *parent;
+#define NODEBASE uint8_t type; jnode *parent;
 // type 1=hash, 2=str
 
 #define SAFE(x) if(pos>=len) { endstate=x; goto Done; }
@@ -54,7 +56,7 @@ jnode *node_hash__get( node_hash *self, const char *key, unsigned keyLen );
 sds node_hash__get_str( node_hash *self, const char *key, unsigned keyLen );
 void node_hash__store( node_hash *self, const char *key, unsigned keyLen, jnode *node );
 
-node_str *node_str__new( const char *str, NODE_STR_LEN_TYPE len, char type );
+node_str *node_str__new( const char *str, NODE_STR_LEN_TYPE len, uint8_t type );
 node_str *node_str__new_from_json( const char *str, NODE_STR_LEN_TYPE len );
 
 node_arr *node_arr__new(void);

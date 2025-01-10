@@ -73,7 +73,7 @@ node_hash *node_hash__new(void) {
     return self;
 }
 
-node_str *node_str__new( const char *str, NODE_STR_LEN_TYPE len, char type ) {
+node_str *node_str__new( const char *str, NODE_STR_LEN_TYPE len, uint8_t type ) {
     node_str *self = ( node_str * ) calloc( sizeof( node_str ), 1 );
     self->type = type; // 2 is str, 4 is number, 5 is a negative number
     self->str = str;
@@ -333,7 +333,9 @@ sds jnode__json( jnode *self, unsigned depth, sds str ) {
     else if( self->type == 6 ) return sdscat( str, "true\n");
     else if( self->type == 7 ) return sdscat( str, "false\n");
     else if( self->type == 8 ) return sdscat( str, "null\n");
-    return NULL;
+    
+    str = sdscat( str, "!error!" );
+    return str;
 }
 
 void jnode__dump_to_makefile( jnode *self, char *prefix ) {
