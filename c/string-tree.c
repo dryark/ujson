@@ -56,7 +56,7 @@ void string_tree__delkey_len( string_tree *self, const char *key, unsigned keyle
 	}
 }
 
-string_tree *string_tree__new() {
+string_tree *string_tree__new(void) {
   string_tree *self = ( string_tree * ) malloc( sizeof( string_tree ) );
 	self->tree = (void *) RBTreeCreate(IntComp,IntDest,InfoDest,IntPrint,InfoPrint);
 	return self;
@@ -155,7 +155,7 @@ snode *snode__new_len( const char *newstr, unsigned nstrlen, void *newdata, char
 	return self;
 }
 
-xjr_arr *xjr_arr__new() {
+xjr_arr *xjr_arr__new(void) {
   xjr_arr *arr = ( xjr_arr * ) calloc( sizeof( xjr_arr ), 1 ); // calloc to ensure initial count is 0
   arr->items = malloc( sizeof( void * ) * XJR_ARR_MAX );
   arr->max = XJR_ARR_MAX;
@@ -176,7 +176,7 @@ void xjr_arr__delete( xjr_arr *self ) {
   free( self );
 }
 
-xjr_key_arr *xjr_key_arr__new() {
+xjr_key_arr *xjr_key_arr__new(void) {
   xjr_key_arr *arr = ( xjr_key_arr * ) calloc( sizeof( xjr_key_arr ), 1 ); // calloc to ensure initial count is 0
   arr->items = malloc( sizeof( void * ) * XJR_KEY_ARR_MAX );
   arr->sizes = malloc( sizeof( unsigned ) * XJR_KEY_ARR_MAX );

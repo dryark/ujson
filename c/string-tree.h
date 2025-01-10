@@ -27,7 +27,7 @@ struct xjr_arr_s {
 	const void **items;
 	char *types;
 };
-xjr_arr *xjr_arr__new();
+xjr_arr *xjr_arr__new(void);
 void xjr_arr__double( xjr_arr *self );
 void xjr_arr__delete( xjr_arr *self );
 
@@ -39,7 +39,7 @@ struct xjr_key_arr_s {
 	const char **items;
 	unsigned *sizes;
 };
-xjr_key_arr *xjr_key_arr__new();
+xjr_key_arr *xjr_key_arr__new(void);
 void xjr_key_arr__double( xjr_key_arr *self );
 void xjr_key_arr__delete( xjr_key_arr *self );
 
@@ -48,7 +48,7 @@ struct string_tree_s {
 };
 typedef struct string_tree_s string_tree;
 snode *string_tree__rawget_len( string_tree *self, const char *key, unsigned keylen );
-string_tree *string_tree__new();
+string_tree *string_tree__new(void);
 void string_tree__delete( string_tree *self );
 void *string_tree__get_len( string_tree *self, const char *key, unsigned keylen, char *dataType );
 void string_tree__delkey_len( string_tree *self, const char *key, unsigned keylen );

@@ -1,6 +1,7 @@
 #ifndef __UJSONIN_H
 #define __UJSONIN_H
 #include"string-tree.h"
+#include"red_black_tree.h"
 
 #define UJDEBUG
 
@@ -47,7 +48,7 @@ typedef struct parser_state_s {
 node_hash *parse( const char *data, unsigned long len, parser_state *beginState, int *err );
 node_hash *parse_file( const char *filename, int *err );
 
-node_hash *node_hash__new();
+node_hash *node_hash__new(void);
 void node_hash__delete( node_hash *node );
 jnode *node_hash__get( node_hash *self, const char *key, unsigned keyLen );
 sds node_hash__get_str( node_hash *self, const char *key, unsigned keyLen );
@@ -56,10 +57,10 @@ void node_hash__store( node_hash *self, const char *key, unsigned keyLen, jnode 
 node_str *node_str__new( const char *str, NODE_STR_LEN_TYPE len, char type );
 node_str *node_str__new_from_json( const char *str, NODE_STR_LEN_TYPE len );
 
-node_arr *node_arr__new();
+node_arr *node_arr__new(void);
 void node_arr__add( node_arr *self, jnode *el );
 
-jnode *node_null__new();
+jnode *node_null__new(void);
 
 // This is an ugly method to dump the contents of a jnode.
 // The output is not a proper JSON representation. You probably shouldn't use this.
@@ -72,7 +73,7 @@ sds jnode__json( jnode *self, unsigned depth, sds str );
 sds jnode__str( jnode *self ); // str value of node
 
 char *slurp_file( const char *filename, unsigned long *outlen );
-void ujsonin_init();
+void ujsonin_init(void);
 void jnode__dump_env( jnode *self );
 void node_hash__dump_to_makefile( node_hash *self, char *prefix );
 void node_hash__delete( node_hash *self );

@@ -66,7 +66,7 @@ jnode *jnode__new( int type ) {
     return self;
 }
 
-node_hash *node_hash__new() {
+node_hash *node_hash__new(void) {
     node_hash *self = ( node_hash * ) calloc( sizeof( node_hash ), 1 );
     self->type = 1;
     self->tree = string_tree__new();
@@ -166,7 +166,7 @@ node_str *node_str__new_from_json( const char *str, NODE_STR_LEN_TYPE len ) {
     return self;
 }
 
-node_arr *node_arr__new() {
+node_arr *node_arr__new(void) {
     node_arr *self = ( node_arr * ) calloc( sizeof( node_arr ), 1 );
     self->type = 3;
     return self;
@@ -385,7 +385,7 @@ typedef struct handle_res_s {
     jnode *node;
 } handle_res;
 
-handle_res *handle_res__new() {
+handle_res *handle_res__new(void) {
     handle_res *self = ( handle_res * ) calloc( sizeof( handle_res ), 1 );
     return self;
 }
@@ -411,14 +411,14 @@ handle_res *handle_null( const char *data, unsigned long  *pos ) {
     return res;
 }
 
-jnode *node_null__new() {
+jnode *node_null__new(void) {
     return jnode__new( 8 );
 }
 
 typedef handle_res* (*ahandler)(const char *, unsigned long * ); 
 
 string_tree *handlers;
-void ujsonin_init() {
+void ujsonin_init(void) {
     handlers = string_tree__new();
     string_tree__store_len( handlers, "true", 4, (void *) &handle_true, 0 );
     string_tree__store_len( handlers, "false", 5, (void *) &handle_false, 0 );
