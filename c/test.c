@@ -82,7 +82,7 @@ int main( int argc, char *argv[] ) {
         exit(0);
     }
     if( !strncmp(cmd,"test",4) ) {
-        int len;
+        unsigned long len;
         char *data = slurp_file( "test.json", &len );
         int err;
         node_hash *root = parse( data, len, NULL, &err );

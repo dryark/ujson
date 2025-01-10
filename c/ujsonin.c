@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include<stdint.h>
+#include<limits.h>
 #include"red_black_tree.h"
 #include"string-tree.h"
 #include"ujsonin.h"
@@ -17,7 +18,7 @@ sds add_indent( sds str, int depth ) {
 }
 
 node_hash *parse_with_default( char *file, char *def, char **d1, char **d2 ) {
-    int flen;
+    unsigned long flen;
     char *fdata = slurp_file( file, &flen );
     if( !fdata ) {
         printf("Could not open file '%s'\n", file );
@@ -25,7 +26,7 @@ node_hash *parse_with_default( char *file, char *def, char **d1, char **d2 ) {
     }
     int ferr;
     node_hash *froot = parse( fdata, flen, NULL, &ferr );
-    int dlen;
+    unsigned long dlen;
     char *ddata = NULL;
     int derr;
     
@@ -42,7 +43,7 @@ node_hash *parse_with_default( char *file, char *def, char **d1, char **d2 ) {
     return both;
 }
 
-char *slurp_file( const char *filename, int *outlen ) { 
+char *slurp_file( const char *filename, unsigned long *outlen ) { 
     char *data;
     FILE *fh = fopen( filename, "r" );
     if( !fh ) {
@@ -50,7 +51,7 @@ char *slurp_file( const char *filename, int *outlen ) {
         return 0;
     }
     fseek( fh, 0, SEEK_END );
-    long int fileLength = ftell( fh );
+    unsigned long fileLength = ftell( fh );
     fseek( fh, 0, SEEK_SET );
     char *input = malloc( fileLength + 1 );
     input[ fileLength ] = 0x00;
@@ -72,7 +73,7 @@ node_hash *node_hash__new() {
     return self;
 }
 
-node_str *node_str__new( const char *str, int len, char type ) {
+node_str *node_str__new( const char *str, NODE_STR_LEN_TYPE len, char type ) {
     node_str *self = ( node_str * ) calloc( sizeof( node_str ), 1 );
     self->type = type; // 2 is str, 4 is number, 5 is a negative number
     self->str = str;
@@ -88,15 +89,15 @@ char hex_to_num( char hex ) {
     return 0;
 }
 
-node_str *node_str__new_from_json( const char *str, int len ) {
+node_str *node_str__new_from_json( const char *str, NODE_STR_LEN_TYPE len ) {
     node_str *self = ( node_str * ) calloc( sizeof( node_str ), 1 );
     
     char *alloc = malloc( len );
     
-    int len2;
+    NODE_STR_LEN_TYPE len2;
     char let;
-    int io = 0;
-    for( int i=0;i<len;i++ ) {
+    NODE_STR_LEN_TYPE io = 0;
+    for( NODE_STR_LEN_TYPE i=0;i<len;i++ ) {
         let = str[i];
         if( let == '\\' ) {
             if( str[i+1] == 'u' ) {
@@ -181,25 +182,25 @@ void node_arr__add( node_arr *self, jnode *el ) {
     self->tail = el;
 }
 
-void node_hash__dump( node_hash *self, int depth ) {
+void node_hash__dump( node_hash *self, unsigned depth ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     printf("{\n");
-    for( int i=0;i<keys->count;i++ ) {
+    for( unsigned i=0;i<keys->count;i++ ) {
         const char *key = keys->items[i];
-        int len = keys->sizes[i];
-        SPACES printf("\"%.*s\":",len,key);
+        unsigned len = keys->sizes[i];
+        SPACES printf ("\"%.*s\":", len, key );
         jnode__dump( node_hash__get( self, key, len ), depth );
     }
     depth--;
     SPACES printf("}\n");
 }
 
-sds node_hash__str( node_hash *self, int depth, sds str ) {
+sds node_hash__str( node_hash *self, unsigned depth, sds str ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     str = sdscat( str, "{\n");
-    for( int i=0;i<keys->count;i++ ) {
+    for( unsigned i=0;i<keys->count;i++ ) {
         const char *key = keys->items[i];
-        int len = keys->sizes[i];
+        unsigned len = keys->sizes[i];
         str = add_indent( str, depth );
         str = sdscatfmt( str, "\"%p\":", len, key );
         str = jnode__json( node_hash__get( self, key, len ), depth, str );
@@ -211,9 +212,9 @@ sds node_hash__str( node_hash *self, int depth, sds str ) {
 
 void node_hash__delete( node_hash *self ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
-    for( int i=0;i<keys->count;i++ ) {
+    for( unsigned i=0;i<keys->count;i++ ) {
         const char *key = keys->items[i];
-        int len = keys->sizes[i];
+        unsigned len = keys->sizes[i];
         jnode *sub = node_hash__get( self, key, len );
         if( sub->type == 1 ) node_hash__delete( (node_hash *) sub );
         else free( sub );
@@ -227,9 +228,9 @@ void jnode__dump_to_makefile( jnode *self, char *prefix );
 void node_hash__dump_to_makefile( node_hash *self, char *prefix ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     char pref2[ 100 ];
-    for( int i=0;i<keys->count;i++ ) {
+    for( unsigned i=0;i<keys->count;i++ ) {
         const char *key = keys->items[i];
-        int len = keys->sizes[i];
+        NODE_STR_LEN_TYPE len = keys->sizes[i];
         jnode *val = node_hash__get( self, key, len );
         if( val->type != 1 ) printf("%s%.*s := ",prefix?prefix:"",len,key);
         else {
@@ -241,10 +242,10 @@ void node_hash__dump_to_makefile( node_hash *self, char *prefix ) {
     }
 }
 
-void node_arr__dump( node_arr *self, int depth ) {
+void node_arr__dump( node_arr *self, unsigned depth ) {
     printf("[\n");
     jnode *cur = self->head;
-    for( int i=0;i<self->count;i++ ) {
+    for( unsigned i=0;i<self->count;i++ ) {
         SPACES jnode__dump( cur, depth+1 );
         cur = cur->parent; // parent is being reused as next
     }
@@ -252,10 +253,10 @@ void node_arr__dump( node_arr *self, int depth ) {
     SPACES printf("]\n");
 }
 
-sds node_arr__json( node_arr *self, int depth, sds str ) {
+sds node_arr__json( node_arr *self, unsigned depth, sds str ) {
     str = sdscat( str, "[\n" );
     jnode *cur = self->head;
-    for( int i=0;i<self->count;i++ ) {
+    for( unsigned i=0;i<self->count;i++ ) {
         str = add_indent( str, depth );
         str = jnode__json( cur, depth, str );
         cur = cur->parent; // parent is being reused as next
@@ -276,7 +277,7 @@ sds node_arr__json( node_arr *self, int depth, sds str ) {
 7 = false
 8 = null
 */
-void jnode__dump( jnode *self, int depth ) {
+void jnode__dump( jnode *self, unsigned depth ) {
     if( self->type == 1 ) node_hash__dump( (node_hash *) self, depth+1 );
     else if( self->type == 2 ) printf("\"%.*s\"\n", ( (node_str *) self )->len, ( (node_str *) self )->str );
     else if( self->type == 3 ) node_arr__dump( (node_arr *) self, depth+1 );
@@ -309,7 +310,7 @@ sds jnode__str( jnode *self ) {
     return str;
 }
 
-sds jnode__json( jnode *self, int depth, sds str ) {
+sds jnode__json( jnode *self, unsigned depth, sds str ) {
     if( !str ) {
         depth = 0;
         str = sdsempty();
@@ -361,16 +362,16 @@ void jnode__dump_env( jnode *self ) {
     printf("\"");
 }
 
-void node_hash__store( node_hash *self, const char *key, int keyLen, jnode *node ) {
+void node_hash__store( node_hash *self, const char *key, unsigned keyLen, jnode *node ) {
     string_tree__store_len( self->tree, key, keyLen, (void *) node, 0 );
 }
 
-jnode *node_hash__get( node_hash *self, const char *key, int keyLen ) {
+jnode *node_hash__get( node_hash *self, const char *key, unsigned keyLen ) {
     char type;
     return (jnode *) string_tree__get_len( self->tree, key, keyLen, &type );
 }
 
-sds node_hash__get_str( node_hash *self, const char *key, int keyLen ) {
+sds node_hash__get_str( node_hash *self, const char *key, unsigned keyLen ) {
     char type;
     jnode *jnode = string_tree__get_len( self->tree, key, keyLen, &type );
     if( !jnode ) return 0;
@@ -389,21 +390,21 @@ handle_res *handle_res__new() {
     return self;
 }
 
-handle_res *handle_true( const char *data, int *pos ) {
+handle_res *handle_true( const char *data, unsigned long *pos ) {
     jnode *node = jnode__new( 6 );
     handle_res *res = handle_res__new();
     res->node = node;
     return res;
 }
 
-handle_res *handle_false( const char *data, int *pos ) {
+handle_res *handle_false( const char *data, unsigned long *pos ) {
     jnode *node = jnode__new( 7 );
     handle_res *res = handle_res__new();
     res->node = node;
     return res;
 }
 
-handle_res *handle_null( const char *data, int *pos ) {
+handle_res *handle_null( const char *data, unsigned long  *pos ) {
     jnode *node = jnode__new( 8 );
     handle_res *res = handle_res__new();
     res->node = node;
@@ -414,7 +415,7 @@ jnode *node_null__new() {
     return jnode__new( 8 );
 }
 
-typedef handle_res* (*ahandler)(const char *, int * ); 
+typedef handle_res* (*ahandler)(const char *, unsigned long * ); 
 
 string_tree *handlers;
 void ujsonin_init() {
@@ -425,7 +426,7 @@ void ujsonin_init() {
 }
 
 node_hash *parse_file( const char *filename, int *err ) {
-    int len;
+    unsigned long len;
     char *data = slurp_file( filename, &len );
     if( len < 0 ) {
         *err = -1;
@@ -434,8 +435,9 @@ node_hash *parse_file( const char *filename, int *err ) {
     return parse( data, len, NULL, err );
 }
 
-node_hash *parse( const char *data, int len, parser_state *beginState, int *err ) {
-    int pos = 1, keyLen, typeStart;
+node_hash *parse( const char *data, unsigned long len, parser_state *beginState, int *err ) {
+    unsigned long pos = 1, typeStart;
+    unsigned keyLen;
     int endstate = 0;
     uint8_t neg = 0;
     const char *keyStart, *strStart;
@@ -589,7 +591,7 @@ TypeX: SAFEGET(11)
     }*/
     pos--; // go back a character; we've encountered a non-type character
     // Type name is done
-    int typeLen = pos - typeStart; 
+    unsigned typeLen = (unsigned) pos - typeStart; 
     // do something with the type
     char htype;
     ahandler handler = (ahandler) string_tree__get_len( handlers, &data[ typeStart ], typeLen, &htype );
@@ -636,7 +638,7 @@ Number1: SAFE(15)
 NumberX: SAFEGET(16)
     if( let == '.' ) goto AfterDot;
     if( let < '0' || let > '9' ) {
-        int strLen = &data[pos-1] - strStart;
+        NODE_STR_LEN_TYPE strLen = (NODE_STR_LEN_TYPE) (&data[pos-1] - strStart);
         jnode *newStr = (jnode *) node_str__new( strStart, strLen, neg ? 5 : 4 );
         if( cur->type == 1 ) {
             node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
@@ -650,7 +652,7 @@ NumberX: SAFEGET(16)
     goto NumberX;
 AfterDot: SAFEGET(20)
     if( let < '0' || let > '9' ) {
-        int strLen = &data[pos-1] - strStart;
+        NODE_STR_LEN_TYPE strLen = (NODE_STR_LEN_TYPE) ( &data[pos-1] - strStart );
         jnode *newStr = (jnode *) node_str__new( strStart, strLen, neg ? 5 : 4 );
         if( cur->type == 1 ) {
             node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
@@ -693,7 +695,7 @@ String1: SAFEGET(17)
 StringX: SAFEGET(18)
     StringX2:
     if( ( !stringType && let == '"' ) || ( stringType && let == '\'' ) ) {
-       int strLen = &data[pos-1] - strStart;
+       NODE_STR_LEN_TYPE strLen = (NODE_STR_LEN_TYPE) (&data[pos-1] - strStart);
        jnode *newStr;
        if( slashCnt ) newStr = (jnode *) node_str__new_from_json( strStart, strLen );
        else newStr = (jnode *) node_str__new( strStart, strLen, 2 );
