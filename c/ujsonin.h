@@ -2,6 +2,8 @@
 #define __UJSONIN_H
 #include"string-tree.h"
 
+#define UJDEBUG
+
 // sds is used for strings
 // Anytime you get a sds back, you can treat it like a char*, but you must sdsfree it when done.
 #include"sds.h"

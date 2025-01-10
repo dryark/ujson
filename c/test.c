@@ -109,6 +109,10 @@ int main( int argc, char *argv[] ) {
         printf("]\n");
         sdsfree( str3 );
         
+        char *json = jnode__json( (jnode *) root, 0, NULL );
+        printf("json:%s\n", json );
+        sdsfree( json );
+        
         node_hash__delete( root );
         exit(0);   
     }

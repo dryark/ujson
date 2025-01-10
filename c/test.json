@@ -3,4 +3,5 @@
   str: "tes\" 't"
   str2: 'tes\' "t'
   nums: [1,2,3]
+  "array": [ "str", 1, { sub: 2 } ]
 }

@@ -202,7 +202,7 @@ sds node_hash__str( node_hash *self, unsigned depth, sds str ) {
         const char *key = keys->items[i];
         unsigned len = keys->sizes[i];
         str = add_indent( str, depth );
-        str = sdscatfmt( str, "\"%p\":", len, key );
+        str = sdscatfmt( str, "\"%p\":", (unsigned) len, key );
         str = jnode__json( node_hash__get( self, key, len ), depth, str );
     }
     str = add_indent( str, depth-1 );
@@ -268,7 +268,7 @@ sds node_arr__json( node_arr *self, unsigned depth, sds str ) {
 }
 
 /*
-1
+1 = node hash
 2 = double quoted string
 3 = array
 4 = positive int
@@ -446,6 +446,8 @@ node_hash *parse( const char *data, unsigned long len, parser_state *beginState,
     int errIgnore;
     if( !err ) err = &errIgnore;
     char stringType = 0;
+    unsigned arrayStackPos = 0;
+    jnode *arrayParentStack[10];
     
     node_hash *root = node_hash__new();
     jnode *cur = ( jnode * ) root;
@@ -466,7 +468,7 @@ node_hash *parse( const char *data, unsigned long len, parser_state *beginState,
             case 9: goto Colon;
             case 10: goto AfterColon;
             case 11: goto TypeX; // capture of a named type ( true/false included )
-            case 12: goto Arr;
+            //case 12: goto Arr;
             case 13: goto AC_Comment; // comments after : and before value
             case 14: goto AC_Comment2;
             case 15: goto Number1;
@@ -524,6 +526,9 @@ KeyName1: SAFE(7)
 KeyNameX: SAFEGET(8)
     if( let == ':' ) {
         keyLen = &data[pos-1] - keyStart;
+        #ifdef UJDEBUG
+        printf("key %.*s\n", keyLen, keyStart );
+        #endif
         goto AfterColon;
     }
     if( let == ' ' || let == '\t' ) {
@@ -569,15 +574,23 @@ AfterColon: SAFEGET(10)
     if( let >= '0' && let <= '9' ) { neg=0; goto Number1; }
     if( let == '-' ) { neg=1; pos++; goto Number1; }
     if( let == '[' ) {
+        #ifdef UJDEBUG
+        printf("Entering array\n" );
+        #endif
         node_arr *newArr = node_arr__new();
-        newArr->parent = cur;
+        //newArr->parent = cur;
+        arrayParentStack[ arrayStackPos++ ] = cur;
         if( cur->type == 1 ) node_hash__store( (node_hash *) cur, keyStart, keyLen, (jnode *) newArr );
         if( cur->type == 3 ) node_arr__add( (node_arr *) cur, (jnode *) newArr );
         cur = (jnode *) newArr;
         goto AfterColon;
     }
     if( let == ']' ) {
-        cur = cur->parent;
+        #ifdef UJDEBUG
+        printf("Exiting array\n" );
+        #endif
+        //cur = cur->parent;
+        cur = arrayParentStack[ --arrayStackPos ];
         if( cur->type == 3 ) goto AfterColon;
         if( cur->type == 1 ) goto Hash;
         // should never reach here
@@ -621,12 +634,6 @@ TypeX: SAFEGET(11)
     if( let == ' ' || let == 0x0d || let == 0x0a || let == '\t' ) goto AfterType;
     // something else. garbage. :(
     goto AfterType;*/
-Arr: SAFEGET(12)
-    // TODO: stack of array tails
-    if( let == ']' ) {
-        goto AfterVal;
-    }
-    goto Arr;
 AC_Comment: SAFEGET(13)
     if( let == 0x0d || let == 0x0a ) goto AfterColon;
     goto AC_Comment;
@@ -640,12 +647,17 @@ NumberX: SAFEGET(16)
     if( let < '0' || let > '9' ) {
         NODE_STR_LEN_TYPE strLen = (NODE_STR_LEN_TYPE) (&data[pos-1] - strStart);
         jnode *newStr = (jnode *) node_str__new( strStart, strLen, neg ? 5 : 4 );
-        if( cur->type == 1 ) {
+        if( cur->type == 1 ) { // hash, expecting key
             node_hash__store( (node_hash *) cur, keyStart, keyLen, newStr );
+            pos--; // Don't eat this character
             goto AfterVal;
         }
         if( cur->type == 3 ) {
+            #ifdef UJDEBUG
+            printf("Finished number, waiting for value\n" );
+            #endif
             node_arr__add( (node_arr *) cur, newStr );
+            pos--; // Don't eat this character
             goto AfterColon;
         }
     }
