@@ -81,7 +81,7 @@ int main( int argc, char *argv[] ) {
         //jnode__dump_env( cur );
         exit(0);
     }
-    if( !strncmp(cmd,"test",4) ) {
+    if( !strcmp(cmd,"test") ) {
         unsigned long len;
         char *data = slurp_file( "test.json", &len );
         int err;
@@ -108,6 +108,19 @@ int main( int argc, char *argv[] ) {
         fputs( str3, stdout );
         printf("]\n");
         sdsfree( str3 );
+        
+        char *json = jnode__json( (jnode *) root, 0, NULL );
+        printf("json:%s\n", json );
+        sdsfree( json );
+        
+        node_hash__delete( root );
+        exit(0);   
+    }
+    if( !strcmp(cmd,"test2") ) {
+        unsigned long len;
+        char *data = slurp_file( "test2.json", &len );
+        int err;
+        node_hash *root = parse( data, len, NULL, &err );
         
         char *json = jnode__json( (jnode *) root, 0, NULL );
         printf("json:%s\n", json );

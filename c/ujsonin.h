@@ -5,7 +5,7 @@
 #include"sdsalloc.h"
 #include<stdint.h>
 
-#define UJDEBUG
+//#define UJDEBUG
 
 // sds is used for strings
 // Anytime you get a sds back, you can treat it like a char*, but you must sdsfree it when done.
@@ -25,6 +25,7 @@ typedef struct jnode_s jnode;
 struct jnode_s { NODEBASE };
 
 typedef struct node_hash_s { NODEBASE
+    uint8_t refCnt;
     string_tree *tree;
 } node_hash;
 

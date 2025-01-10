@@ -70,6 +70,7 @@ node_hash *node_hash__new(void) {
     node_hash *self = ( node_hash * ) calloc( sizeof( node_hash ), 1 );
     self->type = 1;
     self->tree = string_tree__new();
+    // We are using refCnt 0 as 1, and 255 as 0
     return self;
 }
 
@@ -211,6 +212,8 @@ sds node_hash__str( node_hash *self, unsigned depth, sds str ) {
 }
 
 void node_hash__delete( node_hash *self ) {
+    self->refCnt--;
+    if( self->refCnt < 255 ) return; // 255 == no references; 0 = 1 reference
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     for( unsigned i=0;i<keys->count;i++ ) {
         const char *key = keys->items[i];

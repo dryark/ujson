@@ -1,0 +1,12 @@
+{
+  string: "a string"
+  int: 12
+  negint: -13
+  true: true
+  false: false
+  null: null
+  array: [ "str", 1, { sub: 2 } ]
+  sub2: {
+    blah: 10
+  }
+}
