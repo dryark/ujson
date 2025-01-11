@@ -444,6 +444,18 @@ jnode *node_null__new(void) {
     return jnode__new( 8 );
 }
 
+jnode *node_true__new(void) {
+    return jnode__new( 6 );
+}
+
+jnode *node_false__new(void) {
+    return jnode__new( 7 );
+}
+
+jnode *node_bool__new( uint8_t val ) {
+    return jnode__new( val ? 6 : 7 );
+}
+
 typedef handle_res* (*ahandler)(const char *, unsigned long * ); 
 
 string_tree *handlers;

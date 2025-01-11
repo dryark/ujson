@@ -64,6 +64,9 @@ node_arr *node_arr__new(void);
 void node_arr__add( node_arr *self, jnode *el );
 
 jnode *node_null__new(void);
+jnode *node_true__new(void);
+jnode *node_false__new(void);
+jnode *node_bool__new( uint8_t val );
 
 // This is an ugly method to dump the contents of a jnode.
 // The output is not a proper JSON representation. You probably shouldn't use this.

@@ -2,7 +2,7 @@
 
 #include "string-tree.h"
 #include <string.h>
-#include<stdio.h>
+//#include<stdio.h>
 #include "red_black_tree.h"
 
 void KeycacheDestroyNode(void *a);
@@ -74,7 +74,7 @@ string_tree *string_tree__new(void) {
 string_tree *keycache = NULL;
 void keycache__new(void) {
   if( keycache ) return;
-  printf("Creating keycache\n");
+  //printf("Creating keycache\n");
   keycache = ( string_tree * ) malloc( sizeof( string_tree ) );
   keycache->tree = (void *) RBTreeCreate(IntComp,IntDest,KeycacheDestroyNode,IntPrint,InfoPrint);
 }
