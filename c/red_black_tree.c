@@ -15,12 +15,12 @@ rb_red_blk_tree* RBTreeCreate( int (*CompFunc) (const void*,const void*),
   newTree->PrintInfo= PrintInfo;
   newTree->DestroyInfo= InfoDestFunc;
 
-  temp=newTree->nil= (rb_red_blk_node*) malloc(sizeof(rb_red_blk_node));
+  temp=newTree->nilx= (rb_red_blk_node*) malloc(sizeof(rb_red_blk_node));
   temp->parent=temp->left=temp->right=temp;
   temp->red=0;
   temp->key=0;
   temp=newTree->root= (rb_red_blk_node*) malloc(sizeof(rb_red_blk_node));
-  temp->parent=temp->left=temp->right=newTree->nil;
+  temp->parent=temp->left=temp->right=newTree->nilx;
   temp->key=0;
   temp->red=0;
   return(newTree);
@@ -28,7 +28,7 @@ rb_red_blk_tree* RBTreeCreate( int (*CompFunc) (const void*,const void*),
 
 void LeftRotate(rb_red_blk_tree* tree, rb_red_blk_node* x) {
   rb_red_blk_node* y;
-  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* nil=tree->nilx;
   y=x->right;
   x->right=y->left;
   if (y->left != nil) y->left->parent=x;
@@ -45,7 +45,7 @@ void LeftRotate(rb_red_blk_tree* tree, rb_red_blk_node* x) {
 
 void RightRotate(rb_red_blk_tree* tree, rb_red_blk_node* y) {
   rb_red_blk_node* x;
-  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* nil=tree->nilx;
   x=y->left;
   y->left=x->right;
   if (nil != x->right)  x->right->parent=y; /*used to use sentinel here */
@@ -62,7 +62,7 @@ void RightRotate(rb_red_blk_tree* tree, rb_red_blk_node* y) {
 void TreeInsertHelp(rb_red_blk_tree* tree, rb_red_blk_node* z) {
   rb_red_blk_node* x;
   rb_red_blk_node* y;
-  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* nil=tree->nilx;
   
   z->left=z->right=nil;
   y=tree->root;
@@ -139,7 +139,7 @@ rb_red_blk_node * RBTreeInsert(rb_red_blk_tree* tree, void* key, void* info) {
 
 rb_red_blk_node* TreeSuccessor(rb_red_blk_tree* tree,rb_red_blk_node* x) { 
   rb_red_blk_node* y;
-  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* nil=tree->nilx;
   rb_red_blk_node* root=tree->root;
 
   if (nil != (y = x->right)) { /* assignment to y is intentional */
@@ -160,7 +160,7 @@ rb_red_blk_node* TreeSuccessor(rb_red_blk_tree* tree,rb_red_blk_node* x) {
 
 rb_red_blk_node* TreePredecessor(rb_red_blk_tree* tree, rb_red_blk_node* x) {
   rb_red_blk_node* y;
-  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* nil=tree->nilx;
   rb_red_blk_node* root=tree->root;
 
   if (nil != (y = x->left)) { /* assignment to y is intentional */
@@ -180,7 +180,7 @@ rb_red_blk_node* TreePredecessor(rb_red_blk_tree* tree, rb_red_blk_node* x) {
 }
 
 void TreeForEach(rb_red_blk_tree *tree, void (*Func)(void*), rb_red_blk_node *x) {
-    rb_red_blk_node* nil = tree->nil;
+    rb_red_blk_node* nil = tree->nilx;
     rb_red_blk_node* root = tree->root;
     if( !x ) x = tree->root->left;
     if( x->left != nil ) TreeForEach( tree, Func, x->left );
@@ -189,7 +189,7 @@ void TreeForEach(rb_red_blk_tree *tree, void (*Func)(void*), rb_red_blk_node *x)
 }
 
 void TreeForEach1p(rb_red_blk_tree *tree, void (*Func)(void*,void*), void *param, rb_red_blk_node *x) {
-    rb_red_blk_node* nil = tree->nil;
+    rb_red_blk_node* nil = tree->nilx;
     rb_red_blk_node* root = tree->root;
     if( !x ) x = tree->root->left;
     if( x->left != nil ) TreeForEach1p( tree, Func, param, x->left );
@@ -198,7 +198,7 @@ void TreeForEach1p(rb_red_blk_tree *tree, void (*Func)(void*,void*), void *param
 }
 
 void TreeDestHelper(rb_red_blk_tree* tree, rb_red_blk_node* x) {
-  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* nil=tree->nilx;
   if (x != nil) {
     TreeDestHelper(tree,x->left);
     TreeDestHelper(tree,x->right);
@@ -211,13 +211,13 @@ void TreeDestHelper(rb_red_blk_tree* tree, rb_red_blk_node* x) {
 void RBTreeDestroy(rb_red_blk_tree* tree) {
   TreeDestHelper(tree,tree->root->left);
   free(tree->root);
-  free(tree->nil);
+  free(tree->nilx);
   free(tree);
 }
 
 rb_red_blk_node* RBExactQuery(rb_red_blk_tree* tree, void* q) {
   rb_red_blk_node* x=tree->root->left;
-  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* nil=tree->nilx;
   int compVal;
   if (x == nil) return(0);
   compVal=tree->Compare(x->key,(int*) q);
@@ -294,7 +294,7 @@ void RBDeleteFixUp(rb_red_blk_tree* tree, rb_red_blk_node* x) {
 void RBDelete(rb_red_blk_tree* tree, rb_red_blk_node* z){
   rb_red_blk_node* y;
   rb_red_blk_node* x;
-  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* nil=tree->nilx;
   rb_red_blk_node* root=tree->root;
 
   y= ((z->left == nil) || (z->right == nil)) ? z : TreeSuccessor(tree,z);
