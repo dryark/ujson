@@ -2,7 +2,16 @@
 
 #include "string-tree.h"
 #include <string.h>
+#include<stdio.h>
 #include "red_black_tree.h"
+
+void KeycacheDestroyNode(void *a);
+
+typedef struct keycache_node_s {
+  const char *str;
+	unsigned strlen;
+  struct keycache_node_s *next;
+} keycache_node;
 
 uint32_t fnv1a_len( const char *str, unsigned strlen ) {
 	uint32_t hval = 0;
@@ -62,8 +71,16 @@ string_tree *string_tree__new(void) {
 	return self;
 }
 
+string_tree *keycache = NULL;
+void keycache__new(void) {
+  if( keycache ) return;
+  printf("Creating keycache\n");
+  keycache = ( string_tree * ) malloc( sizeof( string_tree ) );
+  keycache->tree = (void *) RBTreeCreate(IntComp,IntDest,KeycacheDestroyNode,IntPrint,InfoPrint);
+}
+
 void string_tree__delete( string_tree *self ) {
-	RBTreeDestroy( (rb_red_blk_tree *) self->tree );
+  RBTreeDestroy( (rb_red_blk_tree *) self->tree );
 	free( self );
 }
 
@@ -101,6 +118,58 @@ snode *string_tree__rawget_len( string_tree *self, const char *key, unsigned key
 	return NULL;
 }
 
+keycache_node *keycache__rawget_len( string_tree *self, const char *key, unsigned keylen ) {
+	uint32_t hash = fnv1a_len( key, keylen );
+	rb_red_blk_node* rbnode = RBExactQuery( (rb_red_blk_tree *) self->tree, &hash );
+	if( !rbnode ) { return 0; }
+	keycache_node *node = (keycache_node *) rbnode->info;
+	while( node ) {
+		if( node->strlen ) {
+			if( keylen == node->strlen && !strncmp( node->str, key, node->strlen ) ) return node;
+		}
+		else {
+			int nslen = strlen( node->str );
+			if( nslen == keylen && !strncmp( node->str, key, keylen ) ) return node;
+		}
+		node = node->next;
+	}
+	return NULL;
+}
+
+keycache_node *keycache_node__new( const char *key, unsigned keylen ) {
+  keycache_node *self = ( keycache_node * ) malloc( sizeof( keycache_node ) );
+	self->next = NULL;
+	self->str = strdup(key);
+	self->strlen = keylen;
+	return self;
+}
+
+const char *keycache__store( const char *key, unsigned keylen ) {
+  if( !keycache ) keycache__new();
+  uint32_t hash = fnv1a_len( key, keylen );
+  
+  keycache_node *curnode = keycache__rawget_len( keycache, key, keylen );
+  if( curnode ) {
+    if( curnode->strlen == keylen && !strncmp( curnode->str, key, keylen ) ) return curnode->str;
+    
+    while( curnode->next ) {
+      curnode = curnode->next;
+      if( curnode->strlen == keylen && !strncmp( curnode->str, key, keylen ) ) return curnode->str;
+    }
+    
+    keycache_node *newnode = keycache_node__new( key, keylen );
+    curnode->next = newnode;
+    return newnode->str;
+  }
+  else {
+    curnode = keycache_node__new( key, keylen );
+    uint32_t *hdup = malloc( sizeof( uint32_t ) );
+    *hdup = hash;
+    RBTreeInsert( (rb_red_blk_tree *) keycache->tree, hdup, curnode );
+    return curnode->str;
+  }
+}
+
 void string_tree__store_len( string_tree *self, const char *key, unsigned keylen, void *node, char dataType ) {
 	uint32_t hash = fnv1a_len( key, keylen );
 	snode *curnode = string_tree__rawget_len( self, key, keylen );
@@ -132,7 +201,14 @@ void IntPrint(const void* a) {
 void InfoPrint(void* a) {
 }
 void InfoDest(void *a){
-	free( a );
+	//free( a );
+	snode__delete( a );
+}
+void KeycacheDestroyNode(void *a){
+  //char *str = (char *) a;
+  keycache_node *node = (keycache_node *) a;
+  free( (char *) node->str );
+	free( node );
 }
 
 void snode__delete( snode *self ) {
@@ -201,6 +277,19 @@ void xjr_key_arr__delete( xjr_key_arr *self ) {
   free( self->items );
   free( self->sizes );
   free( self );
+}
+
+/*void keycache__delete_one( void *node, void *result ) {
+  // result is NULL; don't need it
+  free( node ); // it's just a char *
+}*/
+
+void keycache__delete(void) {
+  if( !keycache ) return;
+  //TreeForEach1p( keycache->tree, keycache__delete_one, NULL, NULL );
+	RBTreeDestroy( (rb_red_blk_tree *) keycache->tree );
+	free( keycache );
+	keycache = NULL;
 }
 
 xjr_key_arr *string_tree__getkeys( string_tree *self ) {

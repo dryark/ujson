@@ -60,4 +60,9 @@ void IntPrint(const void* a); void InfoPrint(void *); void InfoDest(void *);
 
 xjr_key_arr *string_tree__getkeys( string_tree *self );
 void string_tree__getkeys_rec( void *snodeV, void *arrV );
+
+// Key Cache
+const char *keycache__store( const char *key, unsigned keylen );
+void keycache__delete(void);
+
 #endif

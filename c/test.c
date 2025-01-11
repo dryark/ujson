@@ -129,6 +129,18 @@ int main( int argc, char *argv[] ) {
         node_hash__delete( root );
         exit(0);   
     }
+    if( !strcmp(cmd,"kc") ) { // keycache test
+        const char *key = "test";
+        
+        const char *k1 = keycache__store( "test", 4 );
+        printf("k1 == key? %i; strings equal k1,key:%i\n", k1 == key, !strcmp(k1,key) );
+        
+        const char *k2 = keycache__store( "test", 4 );
+        printf("k2 == k1? %i\n", k2 == k1 );
+        
+        keycache__delete();
+        exit(0);
+    }
     
     fprintf(stderr,"Unknown command '%s'\n", cmd );
     return 1;

@@ -211,6 +211,9 @@ sds node_hash__str( node_hash *self, unsigned depth, sds str ) {
     return str;
 }
 
+void node_arr__delete( node_arr *arr );
+void node_str__delete( node_str *node );
+
 void node_hash__delete( node_hash *self ) {
     self->refCnt--;
     if( self->refCnt < 255 ) return; // 255 == no references; 0 = 1 reference
@@ -220,11 +223,32 @@ void node_hash__delete( node_hash *self ) {
         unsigned len = keys->sizes[i];
         jnode *sub = node_hash__get( self, key, len );
         if( sub->type == 1 ) node_hash__delete( (node_hash *) sub );
+        else if( sub->type == 3 ) node_arr__delete( (node_arr *) sub );
+        else if( sub->type == 2 ) node_str__delete( (node_str *) sub );
         else free( sub );
     }
     xjr_key_arr__delete( keys );
     string_tree__delete( self->tree );
     free( self );
+}
+
+void node_arr__delete( node_arr *arr ) {
+    jnode *cur = arr->head;
+    
+    for( unsigned i=0;i<arr->count;i++ ) {
+        jnode *next = cur->parent;
+        if( cur->type == 1 ) node_hash__delete( (node_hash *) cur );
+        else if( cur->type == 3 ) node_arr__delete( (node_arr *) cur );
+        else if( cur->type == 2 ) node_str__delete( (node_str *) cur );
+        else free( cur );
+        
+        cur = next;
+    }
+}
+
+void node_str__delete( node_str *node ) {
+    if( node->alloc ) free( (void *) node->str );
+    free( node );
 }
 
 void jnode__dump_to_makefile( jnode *self, char *prefix );
