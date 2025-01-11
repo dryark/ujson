@@ -395,6 +395,10 @@ void node_hash__store( node_hash *self, const char *key, unsigned keyLen, jnode 
     string_tree__store_len( self->tree, key, keyLen, (void *) node, 0 );
 }
 
+void node_hash__remove( node_hash *self, const char *key, unsigned keylen ) {
+    string_tree__delkey_len( self->tree, key, keylen );
+}
+
 jnode *node_hash__get( node_hash *self, const char *key, unsigned keyLen ) {
     char type;
     return (jnode *) string_tree__get_len( self->tree, key, keyLen, &type );

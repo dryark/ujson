@@ -129,6 +129,26 @@ int main( int argc, char *argv[] ) {
         node_hash__delete( root );
         exit(0);   
     }
+    if( !strcmp(cmd,"del") ) {
+        unsigned long len;
+        char *data = slurp_file( "test_del.json", &len );
+        int err;
+        node_hash *root = parse( data, len, NULL, &err );
+        
+        node_str *d = node_str__new( "4", 1 , 4 );
+        node_hash__store( root, "d", 1, (jnode *) d );
+        
+        node_hash__remove( root, "b", 1 );
+        
+        node_hash__remove( root, "d", 1 );
+        
+        char *json = jnode__json( (jnode *) root, 0, NULL );
+        printf("json:%s\n", json );
+        sdsfree( json );
+        
+        node_hash__delete( root );
+        exit(0);   
+    }
     if( !strcmp(cmd,"kc") ) { // keycache test
         const char *key = "test";
         

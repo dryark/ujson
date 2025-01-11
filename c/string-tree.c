@@ -32,7 +32,6 @@ void string_tree__delkey_len( string_tree *self, const char *key, unsigned keyle
 	rb_red_blk_node* rbnode = RBExactQuery( (rb_red_blk_tree *) self->tree, &hash );
 	
 	// We unfortunately cannot just delete the rbnode; as multiple keys may hash to this same value
-	//if( rbnode ) RBDelete( (rb_red_blk_tree *) self->tree, rbnode ); // automatically deletes info nodes
 	
 	if( !rbnode ) { return; }
 	snode *node = (snode *) rbnode->info;
@@ -48,20 +47,20 @@ void string_tree__delkey_len( string_tree *self, const char *key, unsigned keyle
 			if( nslen == keylen && !strncmp( node->str, key, keylen ) ) delete = 1;
 		}
 		if( delete ) {
-      free( node );// destroy the snode
+		  snode__delete( node );
+		  if( prev ) {
+		    prev->next = next;
+		  }
+		  else {
+		    rbnode->info = next;
+		  }
+		  break;
 		}
-		else {
-      if( prev ) prev->next = node;
-      else rbnode->info = node;
-      prev = node;
-    }
 		node = next;
 	}
-	if( prev ) {
-    prev->next = NULL;
-	}
-	else {
-    rbnode->info = NULL;
+	
+	if( !rbnode->info ) {
+	  RBDelete( (rb_red_blk_tree *) self->tree, rbnode );
 	}
 }
 

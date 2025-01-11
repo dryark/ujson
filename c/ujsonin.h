@@ -56,6 +56,7 @@ void node_hash__delete( node_hash *node );
 jnode *node_hash__get( node_hash *self, const char *key, unsigned keyLen );
 sds node_hash__get_str( node_hash *self, const char *key, unsigned keyLen );
 void node_hash__store( node_hash *self, const char *key, unsigned keyLen, jnode *node );
+void node_hash__remove( node_hash *self, const char *key, unsigned keylen );
 
 node_str *node_str__new( const char *str, NODE_STR_LEN_TYPE len, uint8_t type );
 node_str *node_str__new_from_json( const char *str, NODE_STR_LEN_TYPE len );
