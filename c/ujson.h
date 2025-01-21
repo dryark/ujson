@@ -76,6 +76,9 @@ uj_node *uj_bool__new( uint8_t val );
 // The output is not a proper JSON representation. You probably shouldn't use this.
 void uj_node__dump( uj_node *self, unsigned depth );
 
+// Get the JSONx representation of the jnode. If run on a string, will give a proper JSON string surrounded with quotes
+sds uj_node__jsonx( uj_node *self, unsigned depth, sds str );
+
 // Get the JSON representation of the jnode. If run on a string, will give a proper JSON string surrounded with quotes
 sds uj_node__json( uj_node *self, unsigned depth, sds str );
 

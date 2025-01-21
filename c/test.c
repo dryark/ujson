@@ -122,9 +122,13 @@ int main( int argc, char *argv[] ) {
         int err;
         uj_hash *root = uj_parse( data, len, NULL, &err );
         
-        char *json = uj_node__json( (uj_node *) root, 0, NULL );
+        /*char *json = uj_node__json( (uj_node *) root, 0, NULL );
         printf("json:%s\n", json );
-        sdsfree( json );
+        sdsfree( json );*/
+        
+        char *jsonx = uj_node__jsonx( (uj_node *) root, 0, NULL );
+        printf("jsonx:%s\n", jsonx );
+        sdsfree( jsonx );
         
         uj_hash__delete( root );
         exit(0);   

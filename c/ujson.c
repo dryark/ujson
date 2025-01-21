@@ -9,6 +9,9 @@
 #include"ujson.h"
 #include"sds.h"
 
+sds uj_node__jsonInternal( uj_node *self, unsigned depth, sds str, uint8_t jsonx );
+sds uj_arr__jsonInternal( uj_arr *self, unsigned depth, sds str, uint8_t jsonx );
+
 sds add_indent( sds str, int depth ) {
     if( depth <= 0 ) return str;
     const char spaces[] = "                              "; // 30 spaces
@@ -202,15 +205,60 @@ void uj_hash__dump( uj_hash *self, unsigned depth ) {
 sds uj_hash__str( uj_hash *self, unsigned depth, sds str ) {
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     str = sdscat( str, "{\n");
-    for( unsigned i=0;i<keys->count;i++ ) {
+    
+    unsigned count = keys->count;
+    for( unsigned i=0;i<count;i++ ) {
         const char *key = keys->items[i];
         unsigned len = keys->sizes[i];
         str = add_indent( str, depth );
+        
         str = sdscatfmt( str, "\"%p\":", (unsigned) len, key );
-        str = uj_node__json( uj_hash__get( self, key, len ), depth, str );
+        
+        str = sdscat( str, uj_node__str( uj_hash__get( self, key, len ) ) );
+        if( i < ( count - 1 ) ) {
+            sdscat( str, ",\n" );
+        }
+        else {
+            sdscat( str, "\n" );
+        }
     }
     str = add_indent( str, depth-1 );
     str = sdscat( str, "}\n" );
+    return str;
+}
+
+sds uj_hash__jsonInternal( uj_hash *self, unsigned depth, sds str, uint8_t jsonx ) {
+    xjr_key_arr *keys = string_tree__getkeys( self->tree );
+    str = sdscat( str, "{\n");
+    
+    unsigned count = keys->count;
+    for( unsigned i=0;i<count;i++ ) {
+        const char *key = keys->items[i];
+        unsigned len = keys->sizes[i];
+        str = add_indent( str, depth );
+        
+        if( jsonx ) {
+            str = sdscatfmt( str, "%p:", (unsigned) len, key );
+        }
+        else {
+            str = sdscatfmt( str, "\"%p\":", (unsigned) len, key );
+        }
+        
+        str = uj_node__jsonInternal( uj_hash__get( self, key, len ), depth, str, jsonx );
+        if( !jsonx ) {
+            if( i < ( count - 1 ) ) {
+                str = sdscat( str, ",\n" );
+            }
+            else {
+                str = sdscat( str, "\n" );
+            }
+        }
+        else {
+            str = sdscat( str, "\n" );
+        }
+    }
+    str = add_indent( str, depth-1 );
+    str = sdscat( str, "}" );
     return str;
 }
 
@@ -284,16 +332,38 @@ void uj_arr__dump( uj_arr *self, unsigned depth ) {
 }
 
 sds uj_arr__json( uj_arr *self, unsigned depth, sds str ) {
+    return uj_arr__jsonInternal( self, depth, str, 0 );
+}
+
+sds uj_arr__jsonx( uj_arr *self, unsigned depth, sds str ) {
+    return uj_arr__jsonInternal( self, depth, str, 1 );
+}
+
+sds uj_arr__jsonInternal( uj_arr *self, unsigned depth, sds str, uint8_t jsonx ) {
     str = sdscat( str, "[\n" );
     uj_node *cur = self->head;
-    for( unsigned i=0;i<self->count;i++ ) {
+    unsigned count = self->count;
+    for( unsigned i=0;i<count;i++ ) {
         str = add_indent( str, depth );
         str = uj_node__json( cur, depth, str );
+        
+        if( jsonx ) {
+            str = sdscat( str, "\n" );
+        }
+        else {
+            if( i != ( count - 1 ) ) {
+                str = sdscat( str, ",\n" );
+            }
+            else {
+                str = sdscat( str, "\n" );
+            }
+        }
+        
         cur = cur->parent; // parent is being reused as next
     }
     //depth--;
     str = add_indent( str, depth-1 );
-    str = sdscat( str, "]\n" );
+    str = sdscat( str, "]" );
     return str;
 }
 
@@ -341,28 +411,39 @@ sds uj_node__str( uj_node *self ) {
 }
 
 sds uj_node__json( uj_node *self, unsigned depth, sds str ) {
+    return uj_node__jsonInternal( self, depth, str, 0 );
+}
+
+sds uj_node__jsonx( uj_node *self, unsigned depth, sds str ) {
+    return uj_node__jsonInternal( self, depth, str, 1 );
+}
+
+sds uj_node__jsonInternal( uj_node *self, unsigned depth, sds str, uint8_t jsonx ) {
     if( !str ) {
         depth = 0;
         str = sdsempty();
     }
-    if( self->type == 1 ) return uj_hash__str( (uj_hash *) self, depth+1, str );
+    if( self->type == 1 ) return uj_hash__jsonInternal( (uj_hash *) self, depth+1, str, jsonx );
     else if( self->type == 2 ) {
         str = sdscatrepr( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
-        return sdscat( str, "\n" );
+        //return sdscat( str, "\n" );
+        return str;
     }
-    else if( self->type == 3 ) return uj_arr__json( (uj_arr *) self, depth+1, str );
+    else if( self->type == 3 ) return uj_arr__jsonInternal( (uj_arr *) self, depth+1, str, jsonx );
     else if( self->type == 4 ) {
         str = sdscatlen( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
-        return sdscat( str, "\n" );
+        //return sdscat( str, "\n" );
+        return str;
     }
     else if( self->type == 5 ) {
         str = sdscat( str, "-" );
         str = sdscatlen( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
-        return sdscat( str, "\n" );
+        //return sdscat( str, "\n" );
+        return str;
     }
-    else if( self->type == 6 ) return sdscat( str, "true\n");
-    else if( self->type == 7 ) return sdscat( str, "false\n");
-    else if( self->type == 8 ) return sdscat( str, "null\n");
+    else if( self->type == 6 ) return sdscat( str, "true");
+    else if( self->type == 7 ) return sdscat( str, "false");
+    else if( self->type == 8 ) return sdscat( str, "null");
     
     str = sdscat( str, "!error!" );
     return str;

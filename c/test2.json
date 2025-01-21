@@ -7,6 +7,7 @@
   null: null
   array: [ "str", 1, { sub: 2 } ]
   sub2: {
-    blah: 10
+    blah1: 10
+    blah2: 20
   }
 }

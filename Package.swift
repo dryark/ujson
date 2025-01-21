@@ -10,11 +10,22 @@ let package = Package(
             type: .static,
             targets: ["ujson","stringtree","redblacktree","sds"]
         ),
+        .library(
+            name: "ujsonObjc",
+            targets: ["ujsonObjc"]
+        )
     ],
     dependencies: [],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
+        .target(
+            name: "ujsonObjc",
+            dependencies: ["ujson"],
+            path: "objc",
+            sources: ["ujsonObjc.m"],
+            publicHeadersPath: "."
+        ),
         .target(
             name: "ujson",
             dependencies: [],//["stringtree","redblacktree","sds"],
@@ -23,7 +34,6 @@ let package = Package(
             sources: ["ujson.c"],
             publicHeadersPath: "."
         ),
-        
         .target(
             name: "stringtree",
             dependencies: [],
