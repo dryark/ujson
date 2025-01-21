@@ -1,4 +1,4 @@
-../readme.txtMicro "JSON" reader/writer. Parses a superset of JSON.
+Micro "JSON" reader/writer. Parses a superset of JSON.
 
 Work in progress.
 
