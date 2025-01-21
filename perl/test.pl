@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 use lib 'mod';
-use Ujsonin;
+use Ujson;
 use Data::Dumper;
 
 my $data = qq|{
@@ -19,6 +19,6 @@ my $data = qq|{
     num: 10,
     neg: -35
 }|;
-Ujsonin::init();
-my $root = Ujsonin::parse( $data, 0 );
+Ujson::init();
+my $root = Ujson::parse( $data, 0 );
 print Dumper( $root );

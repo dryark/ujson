@@ -1,4 +1,7 @@
-package Ujsonin;
+# Copyright (C) 2025 David Helkowski
+# Fair Coding License 1.0+
+
+package Ujson;
 
 my $handlers = {};
 

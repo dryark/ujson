@@ -1,21 +1,29 @@
-This "JSON" parser parses a subset of JSON.
+../readme.txtMicro "JSON" reader/writer. Parses a superset of JSON.
+
+Work in progress.
+
+The goal is to implement it in multiple languages doing it natively in each
+langauge.
+
+Currently there are differences in what is supported between the different
+language versions.
+
+TODO: Details exactly what is supported in each language. Tests could help
+with this.
 
 It parses "JSON" with the following features:
-* Double quoted string keys ( unquoted keys are not yet allowed )
+* Double quoted string keys
 * Double quoted string values
 * Unquoted string keys
-* Single quoted string keys ( only in C )
+* Single quoted string keys
 * Inset hashes
 * C styles comments ( both //comment and /*comment*/ )
-* Escaped double quotes within keys ( only in C )
+* Escaped double quotes within keys
+* Escaped extended values \XXXX
 * Arrays
 * N-digit positive and negative integers
 * Booleans ( true/false )
 * null
-
-The following JSON features are not supported currently:
-* Numbers with . or exponents
-* Escaped double quotes within values
 
 The following additional "features" exist:
 * Commas between things can be added or left out; they have no effect
@@ -26,7 +34,7 @@ The following additional "features" exist:
 * String values can contain carriage returns
 * Key "case" does matter
 * When dumping "JSON", quotes are left off "basic keys" ( keys starting with a letter
-  and containing only alphanumerics ) - for Golang only currently
+  and containing only alphanumerics )
 
 Known bugs / deficiencies:
 * Functions aren't prefixed with anything like ujson, nor are any kept private, so
@@ -38,21 +46,11 @@ Known bugs / deficiencies:
 * Error is currently never set to anything. There used to be a single error, but it
   wasn't needed and was pointless so I removed it. If you feed the parser garbage,
   you'll just get garbage back. -shrug-
-* No malloc / calloc memory allocations are checked to see if they return null. If
+* Memory allocations aren't checked to see if they return null. If
   you run out of memory the program will just crash when it tries to use a null
-  pointer. -shrug-
-* JSON longer than 'int' size ( of your compiler ) isn't currently supported. If you
-  are running on a 16-bit platform, this means 32k limit to JSON on those platforms.
-  It depends on both your platform and your compiler really.
+  pointer.
   
-Resolves bugs / deficiences:
-* Solved by node_hash__delete -> There is no json__delete yet to clean up a parsed structure when no longer needed
-* Solved by implementation of types -> If you have a "unquoted value" other than true, false, or null, the parser
-    currently crashes and exits intentionally right now. This is obviously not the best result, and will be fixed
-    soon. The reason it is not implemented better yet is because doing it as desired is much more complicated due
-    to types.
-  
-Proposols:
+Proposals:
 * Extensions
   Example format:
   {

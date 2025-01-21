@@ -1,14 +1,14 @@
-#include"ujsonin.h"
+#include"ujson.h"
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
 #include"sds.h"
 
 int main( int argc, char *argv[] ) {
-    ujsonin_init();
+    uj_init();
     
     if( argc == 1 ) {
-        printf("Usage");
+        printf("Usage: ???\n");
         exit(0);
     }
     string_tree *args = string_tree__new();
@@ -46,7 +46,7 @@ int main( int argc, char *argv[] ) {
         char prefix[100];
         if( prefix1 ) sprintf(prefix,"%s_",prefix1);
         char *d1, *d2;
-        node_hash__dump_to_makefile( parse_with_default(file,defaults, &d1, &d2 ), prefix1 ? prefix : 0 );
+        uj_hash__dump_to_makefile( uj_parse_with_default(file,defaults, &d1, &d2 ), prefix1 ? prefix : 0 );
         exit(0);
     }
     if( !strncmp(cmd,"get",3) ) {
@@ -57,7 +57,7 @@ int main( int argc, char *argv[] ) {
         }
         char *defaults = string_tree__get_len( args, "defaults", 8, &type );
         char *d1,*d2;
-        jnode *cur = (jnode *) parse_with_default( file, defaults, &d1, &d2 );
+        uj_node *cur = (uj_node *) uj_parse_with_default( file, defaults, &d1, &d2 );
         
         void *pathV = string_tree__get_len( args, "path", 4, &type );
         if( !pathV ) {
@@ -75,8 +75,8 @@ int main( int argc, char *argv[] ) {
         for( int i=0;i<6;i++ ) {
             char *part = parts[i];
             if( !part ) break;
-            node_hash *curhash = ( node_hash * ) cur;
-            cur = node_hash__get( curhash, part, strlen( part ) );
+            uj_hash *curhash = ( uj_hash * ) cur;
+            cur = uj_hash__get( curhash, part, strlen( part ) );
         }
         //jnode__dump_env( cur );
         exit(0);
@@ -85,68 +85,68 @@ int main( int argc, char *argv[] ) {
         unsigned long len;
         char *data = slurp_file( "test.json", &len );
         int err;
-        node_hash *root = parse( data, len, NULL, &err );
+        uj_hash *root = uj_parse( data, len, NULL, &err );
         
         printf("Dump of node:\n");
-        jnode__dump( (jnode *) root, 0 );
+        uj_node__dump( (uj_node *) root, 0 );
         printf("--\n\n");
         
         printf("jnode__jsonof node:[");
-        sds str = jnode__json( (jnode *) root, 0, 0 );
+        sds str = uj_node__json( (uj_node *) root, 0, 0 );
         fputs( str, stdout );
         printf("]\n");
         sdsfree( str );
         
         printf("jnode__asstr of str:[");
-        sds str2 = node_hash__get_str( (node_hash *) root, "str", 3 );
+        sds str2 = uj_hash__get_str( (uj_hash *) root, "str", 3 );
         fputs( str2, stdout );
         printf("]\n");
         sdsfree( str2 );
         
         printf("jnode__asstr of str2:[");
-        sds str3 = node_hash__get_str( (node_hash *) root, "str2", 3 );
+        sds str3 = uj_hash__get_str( (uj_hash *) root, "str2", 3 );
         fputs( str3, stdout );
         printf("]\n");
         sdsfree( str3 );
         
-        char *json = jnode__json( (jnode *) root, 0, NULL );
+        char *json = uj_node__json( (uj_node *) root, 0, NULL );
         printf("json:%s\n", json );
         sdsfree( json );
         
-        node_hash__delete( root );
+        uj_hash__delete( root );
         exit(0);   
     }
     if( !strcmp(cmd,"test2") ) {
         unsigned long len;
         char *data = slurp_file( "test2.json", &len );
         int err;
-        node_hash *root = parse( data, len, NULL, &err );
+        uj_hash *root = uj_parse( data, len, NULL, &err );
         
-        char *json = jnode__json( (jnode *) root, 0, NULL );
+        char *json = uj_node__json( (uj_node *) root, 0, NULL );
         printf("json:%s\n", json );
         sdsfree( json );
         
-        node_hash__delete( root );
+        uj_hash__delete( root );
         exit(0);   
     }
     if( !strcmp(cmd,"del") ) {
         unsigned long len;
         char *data = slurp_file( "test_del.json", &len );
         int err;
-        node_hash *root = parse( data, len, NULL, &err );
+        uj_hash *root = uj_parse( data, len, NULL, &err );
         
-        node_str *d = node_str__new( "4", 1 , 4 );
-        node_hash__store( root, "d", 1, (jnode *) d );
+        uj_str *d = uj_str__new( "4", 1 , 4 );
+        uj_hash__store( root, "d", 1, (uj_node *) d );
         
-        node_hash__remove( root, "b", 1 );
+        uj_hash__remove( root, "b", 1 );
         
-        node_hash__remove( root, "d", 1 );
+        uj_hash__remove( root, "d", 1 );
         
-        char *json = jnode__json( (jnode *) root, 0, NULL );
+        char *json = uj_node__json( (uj_node *) root, 0, NULL );
         printf("json:%s\n", json );
         sdsfree( json );
         
-        node_hash__delete( root );
+        uj_hash__delete( root );
         exit(0);   
     }
     if( !strcmp(cmd,"kc") ) { // keycache test

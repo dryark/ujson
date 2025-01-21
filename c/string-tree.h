@@ -1,4 +1,5 @@
 // Copyright (C) 2018 David Helkowski
+// Fair Coding License 1.0+
 
 #ifndef __STRING_TREE_H
 #define __STRING_TREE_H
