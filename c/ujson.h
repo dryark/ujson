@@ -3,6 +3,10 @@
 
 #ifndef __UJSON_H
 #define __UJSON_H
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include"string-tree.h"
 #include"red_black_tree.h"
 #include"sdsalloc.h"
@@ -16,7 +20,16 @@
 
 typedef struct uj_node_s uj_node;
 
-#define NODEBASE uint8_t type; uj_node *parent;
+// We have to use a substruct for the common members
+//   because compilers sometimes will reorder struct
+//   members for efficiency. The first member will though
+//   always stay in the same place.
+typedef struct uj_node_common_s {
+    uint8_t type;
+    uj_node *parent;
+} uj_node_common;
+#define NODEBASE uj_node_common base;
+
 // type 1=hash, 2=str
 
 #define SAFE(x) if(pos>=len) { endstate=x; goto Done; }
@@ -57,8 +70,10 @@ uj_hash *uj_parse_file( const char *filename, int *err );
 uj_hash *uj_hash__new(void);
 void uj_hash__delete( uj_hash *node );
 uj_node *uj_hash__get( uj_hash *self, const char *key, unsigned keyLen );
+uj_node *uj_hash__get_precalc( uj_hash *self, StrWithHash key );
 sds uj_hash__get_str( uj_hash *self, const char *key, unsigned keyLen );
 void uj_hash__store( uj_hash *self, const char *key, unsigned keyLen, uj_node *node );
+void uj_hash__store_precalc( uj_hash *self, StrWithHash key, uj_node *node );
 void uj_hash__remove( uj_hash *self, const char *key, unsigned keylen );
 
 uj_str *uj_str__new( const char *str, NODE_STR_LEN_TYPE len, uint8_t type );
@@ -91,4 +106,7 @@ void uj_node__dump_env( uj_node *self );
 void uj_hash__dump_to_makefile( uj_hash *self, char *prefix );
 void uj_hash__delete( uj_hash *self );
 uj_hash *uj_parse_with_default( char *file, char *def, char **d1, char **d2 );
+#ifdef __cplusplus
+}
+#endif
 #endif

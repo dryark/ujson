@@ -68,13 +68,13 @@ char *slurp_file( const char *filename, unsigned long *outlen ) {
 
 uj_node *uj_node__new( int type ) {
     uj_node *self = ( uj_node * ) calloc( sizeof( uj_node ), 1 );
-    self->type = type;
+    self->base.type = type;
     return self;
 }
 
 uj_hash *uj_hash__new(void) {
     uj_hash *self = ( uj_hash * ) calloc( sizeof( uj_hash ), 1 );
-    self->type = 1;
+    self->base.type = 1;
     self->tree = string_tree__new();
     // We are using refCnt 0 as 1, and 255 as 0
     return self;
@@ -82,7 +82,7 @@ uj_hash *uj_hash__new(void) {
 
 uj_str *uj_str__new( const char *str, NODE_STR_LEN_TYPE len, uint8_t type ) {
     uj_str *self = ( uj_str * ) calloc( sizeof( uj_str ), 1 );
-    self->type = type; // 2 is str, 4 is number, 5 is a negative number
+    self->base.type = type; // 2 is str, 4 is number, 5 is a negative number
     self->str = str;
     self->len = len;
     self->alloc = 0;
@@ -165,7 +165,7 @@ uj_str *uj_str__new_from_json( const char *str, NODE_STR_LEN_TYPE len ) {
     alloc[io] = 0x00;
     len2 = io;
     
-    self->type = 2; // 2 is str
+    self->base.type = 2; // 2 is str
     self->str = alloc;
     self->len = len2;
     self->alloc = 1;
@@ -175,7 +175,7 @@ uj_str *uj_str__new_from_json( const char *str, NODE_STR_LEN_TYPE len ) {
 
 uj_arr *uj_arr__new(void) {
     uj_arr *self = ( uj_arr * ) calloc( sizeof( uj_arr ), 1 );
-    self->type = 3;
+    self->base.type = 3;
     return self;
 }
 
@@ -185,7 +185,7 @@ void uj_arr__add( uj_arr *self, uj_node *el ) {
         self->head = self->tail = el;
         return;
     }
-    self->tail->parent = el;
+    self->tail->base.parent = el;
     self->tail = el;
 }
 
@@ -267,15 +267,15 @@ void uj_str__delete( uj_str *node );
 
 void uj_hash__delete( uj_hash *self ) {
     self->refCnt--;
-    if( self->refCnt < 255 ) return; // 255 == no references; 0 = 1 reference
+    if( self->refCnt < 254 ) return; // 255 == no references; 0 = 1 reference
     xjr_key_arr *keys = string_tree__getkeys( self->tree );
     for( unsigned i=0;i<keys->count;i++ ) {
         const char *key = keys->items[i];
         unsigned len = keys->sizes[i];
         uj_node *sub = uj_hash__get( self, key, len );
-        if( sub->type == 1 ) uj_hash__delete( (uj_hash *) sub );
-        else if( sub->type == 3 ) uj_arr__delete( (uj_arr *) sub );
-        else if( sub->type == 2 ) uj_str__delete( (uj_str *) sub );
+        if( sub->base.type == 1 ) uj_hash__delete( (uj_hash *) sub );
+        else if( sub->base.type == 3 ) uj_arr__delete( (uj_arr *) sub );
+        else if( sub->base.type == 2 ) uj_str__delete( (uj_str *) sub );
         else free( sub );
     }
     xjr_key_arr__delete( keys );
@@ -287,10 +287,10 @@ void uj_arr__delete( uj_arr *arr ) {
     uj_node *cur = arr->head;
     
     for( unsigned i=0;i<arr->count;i++ ) {
-        uj_node *next = cur->parent;
-        if( cur->type == 1 ) uj_hash__delete( (uj_hash *) cur );
-        else if( cur->type == 3 ) uj_arr__delete( (uj_arr *) cur );
-        else if( cur->type == 2 ) uj_str__delete( (uj_str *) cur );
+        uj_node *next = cur->base.parent;
+        if( cur->base.type == 1 ) uj_hash__delete( (uj_hash *) cur );
+        else if( cur->base.type == 3 ) uj_arr__delete( (uj_arr *) cur );
+        else if( cur->base.type == 2 ) uj_str__delete( (uj_str *) cur );
         else free( cur );
         
         cur = next;
@@ -310,7 +310,7 @@ void uj_hash__dump_to_makefile( uj_hash *self, char *prefix ) {
         const char *key = keys->items[i];
         NODE_STR_LEN_TYPE len = keys->sizes[i];
         uj_node *val = uj_hash__get( self, key, len );
-        if( val->type != 1 ) printf("%s%.*s := ",prefix?prefix:"",len,key);
+        if( val->base.type != 1 ) printf("%s%.*s := ",prefix?prefix:"",len,key);
         else {
             if( prefix ) sprintf( pref2, "%s%.*s_", prefix, len, key );
             else sprintf( pref2, "%.*s", len, key );
@@ -325,7 +325,7 @@ void uj_arr__dump( uj_arr *self, unsigned depth ) {
     uj_node *cur = self->head;
     for( unsigned i=0;i<self->count;i++ ) {
         SPACES uj_node__dump( cur, depth+1 );
-        cur = cur->parent; // parent is being reused as next
+        cur = cur->base.parent; // parent is being reused as next
     }
     depth--;
     SPACES printf("]\n");
@@ -359,7 +359,7 @@ sds uj_arr__jsonInternal( uj_arr *self, unsigned depth, sds str, uint8_t jsonx )
             }
         }
         
-        cur = cur->parent; // parent is being reused as next
+        cur = cur->base.parent; // parent is being reused as next
     }
     //depth--;
     str = add_indent( str, depth-1 );
@@ -378,35 +378,35 @@ sds uj_arr__jsonInternal( uj_arr *self, unsigned depth, sds str, uint8_t jsonx )
 8 = null
 */
 void uj_node__dump( uj_node *self, unsigned depth ) {
-    if( self->type == 1 ) uj_hash__dump( (uj_hash *) self, depth+1 );
-    else if( self->type == 2 ) printf("\"%.*s\"\n", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
-    else if( self->type == 3 ) uj_arr__dump( (uj_arr *) self, depth+1 );
-    else if( self->type == 4 ) printf("%.*s\n", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
-    else if( self->type == 5 ) printf("-%.*s\n", ( (uj_str *) self )->len, ( (uj_str *) self )->str );  
-    else if( self->type == 6 ) printf("true\n");
-    else if( self->type == 7 ) printf("false\n");
-    else if( self->type == 8 ) printf("null\n");
+    if( self->base.type == 1 ) uj_hash__dump( (uj_hash *) self, depth+1 );
+    else if( self->base.type == 2 ) printf("\"%.*s\"\n", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+    else if( self->base.type == 3 ) uj_arr__dump( (uj_arr *) self, depth+1 );
+    else if( self->base.type == 4 ) printf("%.*s\n", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+    else if( self->base.type == 5 ) printf("-%.*s\n", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+    else if( self->base.type == 6 ) printf("true\n");
+    else if( self->base.type == 7 ) printf("false\n");
+    else if( self->base.type == 8 ) printf("null\n");
 }
 
 sds uj_node__str( uj_node *self ) {
     sds str = sdsempty();
     int depth = 0;
     
-    if( self->type == 1 ) return uj_hash__str( (uj_hash *) self, depth+1, str );
-    else if( self->type == 2 ) {
+    if( self->base.type == 1 ) return uj_hash__str( (uj_hash *) self, depth+1, str );
+    else if( self->base.type == 2 ) {
         return sdscatlen( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
     }
-    else if( self->type == 3 ) return uj_arr__json( (uj_arr *) self, depth+1, str );
-    else if( self->type == 4 ) {
+    else if( self->base.type == 3 ) return uj_arr__json( (uj_arr *) self, depth+1, str );
+    else if( self->base.type == 4 ) {
         return sdscatlen( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
     }
-    else if( self->type == 5 ) {
+    else if( self->base.type == 5 ) {
         str = sdscat( str, "-" );
         return sdscatlen( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
     }
-    else if( self->type == 6 ) return sdscat( str, "true");
-    else if( self->type == 7 ) return sdscat( str, "false");
-    else if( self->type == 8 ) return sdscat( str, "null");
+    else if( self->base.type == 6 ) return sdscat( str, "true");
+    else if( self->base.type == 7 ) return sdscat( str, "false");
+    else if( self->base.type == 8 ) return sdscat( str, "null");
     return str;
 }
 
@@ -423,60 +423,64 @@ sds uj_node__jsonInternal( uj_node *self, unsigned depth, sds str, uint8_t jsonx
         depth = 0;
         str = sdsempty();
     }
-    if( self->type == 1 ) return uj_hash__jsonInternal( (uj_hash *) self, depth+1, str, jsonx );
-    else if( self->type == 2 ) {
+    if( self->base.type == 1 ) return uj_hash__jsonInternal( (uj_hash *) self, depth+1, str, jsonx );
+    else if( self->base.type == 2 ) {
         str = sdscatrepr( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
         //return sdscat( str, "\n" );
         return str;
     }
-    else if( self->type == 3 ) return uj_arr__jsonInternal( (uj_arr *) self, depth+1, str, jsonx );
-    else if( self->type == 4 ) {
+    else if( self->base.type == 3 ) return uj_arr__jsonInternal( (uj_arr *) self, depth+1, str, jsonx );
+    else if( self->base.type == 4 ) {
         str = sdscatlen( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
         //return sdscat( str, "\n" );
         return str;
     }
-    else if( self->type == 5 ) {
+    else if( self->base.type == 5 ) {
         str = sdscat( str, "-" );
         str = sdscatlen( str, ( (uj_str *) self )->str, ( (uj_str *) self )->len );
         //return sdscat( str, "\n" );
         return str;
     }
-    else if( self->type == 6 ) return sdscat( str, "true");
-    else if( self->type == 7 ) return sdscat( str, "false");
-    else if( self->type == 8 ) return sdscat( str, "null");
+    else if( self->base.type == 6 ) return sdscat( str, "true");
+    else if( self->base.type == 7 ) return sdscat( str, "false");
+    else if( self->base.type == 8 ) return sdscat( str, "null");
     
     str = sdscat( str, "!error!" );
     return str;
 }
 
 void uj_node__dump_to_makefile( uj_node *self, char *prefix ) {
-    if( self->type == 1 ) uj_hash__dump_to_makefile( (uj_hash *) self, prefix );
+    if( self->base.type == 1 ) uj_hash__dump_to_makefile( (uj_hash *) self, prefix );
     else {
         printf("\"");
-        if( self->type == 2 ) printf("%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+        if( self->base.type == 2 ) printf("%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
         //else if( self->type == 3 ) node_arr__dump_to_makefile( (node_arr *) self, 0 );
-        else if( self->type == 4 ) printf("%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
-        else if( self->type == 5 ) printf("-%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );  
-        else if( self->type == 6 ) printf("true");
-        else if( self->type == 7 ) printf("false");
-        else if( self->type == 8 ) printf("false");
+        else if( self->base.type == 4 ) printf("%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+        else if( self->base.type == 5 ) printf("-%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+        else if( self->base.type == 6 ) printf("true");
+        else if( self->base.type == 7 ) printf("false");
+        else if( self->base.type == 8 ) printf("false");
         printf("\"\n");
     }
 }
 
 void uj_node__dump_env( uj_node *self ) {
     printf("\"");
-    if( self->type == 2 ) printf("%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
-    else if( self->type == 4 ) printf("%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
-    else if( self->type == 5 ) printf("-%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );  
-    else if( self->type == 6 ) printf("true");
-    else if( self->type == 7 ) printf("false");
-    else if( self->type == 8 ) printf("null");
+    if( self->base.type == 2 ) printf("%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+    else if( self->base.type == 4 ) printf("%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+    else if( self->base.type == 5 ) printf("-%.*s", ( (uj_str *) self )->len, ( (uj_str *) self )->str );
+    else if( self->base.type == 6 ) printf("true");
+    else if( self->base.type == 7 ) printf("false");
+    else if( self->base.type == 8 ) printf("null");
     printf("\"");
 }
 
 void uj_hash__store( uj_hash *self, const char *key, unsigned keyLen, uj_node *node ) {
     string_tree__store_len( self->tree, key, keyLen, (void *) node, 0 );
+}
+
+void uj_hash__store_precalc( uj_hash *self, StrWithHash key, uj_node *node ) {
+    string_tree__store_precalc( self->tree, key, (void *) node, 0 );
 }
 
 void uj_hash__remove( uj_hash *self, const char *key, unsigned keylen ) {
@@ -486,6 +490,11 @@ void uj_hash__remove( uj_hash *self, const char *key, unsigned keylen ) {
 uj_node *uj_hash__get( uj_hash *self, const char *key, unsigned keyLen ) {
     char type;
     return (uj_node *) string_tree__get_len( self->tree, key, keyLen, &type );
+}
+
+uj_node *uj_hash__get_precalc( uj_hash *self, StrWithHash key ) {
+    char type;
+    return (uj_node *) string_tree__get_precalc( self->tree, key, &type );
 }
 
 sds uj_hash__get_str( uj_hash *self, const char *key, unsigned keyLen ) {
@@ -613,9 +622,9 @@ Hash: SAFE(0)
     if( let == '"' ) goto QQKeyName1;
     if( let == '\'' ) goto QKeyName1;
     if( let >= 'a' && let <= 'z' ) { pos--; goto KeyName1; }
-    if( let == '}' && cur->parent ) {
-        cur = cur->parent;
-        if( cur->type == 3 ) goto AfterColon;
+    if( let == '}' && cur->base.parent ) {
+        cur = cur->base.parent;
+        if( cur->base.type == 3 ) goto AfterColon;
     }
     if( let == '/' && pos < (len-1) ) {
         if( data[pos] == '/' ) { pos++; goto HashComment; }
@@ -679,9 +688,9 @@ AfterColon: SAFEGET(10)
     }
     if( let == '{' ) {
         uj_hash *newHash = uj_hash__new();
-        newHash->parent = cur;
-        if( cur->type == 1 ) uj_hash__store( (uj_hash *) cur, keyStart, keyLen, (uj_node *) newHash );
-        if( cur->type == 3 ) uj_arr__add( (uj_arr *) cur, (uj_node *) newHash );
+        newHash->base.parent = cur;
+        if( cur->base.type == 1 ) uj_hash__store( (uj_hash *) cur, keyStart, keyLen, (uj_node *) newHash );
+        if( cur->base.type == 3 ) uj_arr__add( (uj_arr *) cur, (uj_node *) newHash );
         cur = (uj_node *) newHash;
         goto Hash;
     }
@@ -709,8 +718,8 @@ AfterColon: SAFEGET(10)
         uj_arr *newArr = uj_arr__new();
         //newArr->parent = cur;
         arrayParentStack[ arrayStackPos++ ] = cur;
-        if( cur->type == 1 ) uj_hash__store( (uj_hash *) cur, keyStart, keyLen, (uj_node *) newArr );
-        if( cur->type == 3 ) uj_arr__add( (uj_arr *) cur, (uj_node *) newArr );
+        if( cur->base.type == 1 ) uj_hash__store( (uj_hash *) cur, keyStart, keyLen, (uj_node *) newArr );
+        if( cur->base.type == 3 ) uj_arr__add( (uj_arr *) cur, (uj_node *) newArr );
         cur = (uj_node *) newArr;
         goto AfterColon;
     }
@@ -720,8 +729,8 @@ AfterColon: SAFEGET(10)
         #endif
         //cur = cur->parent;
         cur = arrayParentStack[ --arrayStackPos ];
-        if( cur->type == 3 ) goto AfterColon;
-        if( cur->type == 1 ) goto Hash;
+        if( cur->base.type == 3 ) goto AfterColon;
+        if( cur->base.type == 1 ) goto Hash;
         // should never reach here
     }
     goto AfterColon;
@@ -747,11 +756,11 @@ TypeX: SAFEGET(11)
         exit(1);
     }
     if( res->dest == 0 ) {
-        if( cur->type == 1 ) {
+        if( cur->base.type == 1 ) {
             uj_hash__store( (uj_hash *) cur, keyStart, keyLen, res->node );
             goto AfterVal;
         }
-        if( cur->type == 3 ) {
+        if( cur->base.type == 3 ) {
             uj_arr__add( (uj_arr *) cur, res->node );
             goto AfterColon;
         }
@@ -776,12 +785,12 @@ NumberX: SAFEGET(16)
     if( let < '0' || let > '9' ) {
         NODE_STR_LEN_TYPE strLen = (NODE_STR_LEN_TYPE) (&data[pos-1] - strStart);
         uj_node *newStr = (uj_node *) uj_str__new( strStart, strLen, neg ? 5 : 4 );
-        if( cur->type == 1 ) { // hash, expecting key
+        if( cur->base.type == 1 ) { // hash, expecting key
             uj_hash__store( (uj_hash *) cur, keyStart, keyLen, newStr );
             pos--; // Don't eat this character
             goto AfterVal;
         }
-        if( cur->type == 3 ) {
+        if( cur->base.type == 3 ) {
             #ifdef UJDEBUG
             printf("Finished number, waiting for value\n" );
             #endif
@@ -795,11 +804,11 @@ AfterDot: SAFEGET(20)
     if( let < '0' || let > '9' ) {
         NODE_STR_LEN_TYPE strLen = (NODE_STR_LEN_TYPE) ( &data[pos-1] - strStart );
         uj_node *newStr = (uj_node *) uj_str__new( strStart, strLen, neg ? 5 : 4 );
-        if( cur->type == 1 ) {
+        if( cur->base.type == 1 ) {
             uj_hash__store( (uj_hash *) cur, keyStart, keyLen, newStr );
             goto AfterVal;
         }
-        if( cur->type == 3 ) {
+        if( cur->base.type == 3 ) {
             uj_arr__add( (uj_arr *) cur, newStr );
             goto AfterColon;
         }
@@ -809,11 +818,11 @@ String1: SAFEGET(17)
     slashCnt = 0;
     if( let == '"' ) {
         uj_node *newStr = (uj_node *) uj_str__new( nullStr, 0, 2 );
-        if( cur->type == 1 ) {
+        if( cur->base.type == 1 ) {
             uj_hash__store( (uj_hash *) cur, keyStart, keyLen, newStr );
             goto AfterVal;
         }
-        if( cur->type == 3 ) {
+        if( cur->base.type == 3 ) {
             uj_arr__add( (uj_arr *) cur, newStr );
             goto AfterColon;
         }
@@ -821,11 +830,11 @@ String1: SAFEGET(17)
     }
     if( let == '\'' ) {
         uj_node *newStr = (uj_node *) uj_str__new( nullStr, 0, 2 );
-        if( cur->type == 1 ) {
+        if( cur->base.type == 1 ) {
             uj_hash__store( (uj_hash *) cur, keyStart, keyLen, newStr );
             goto AfterVal;
         }
-        if( cur->type == 3 ) {
+        if( cur->base.type == 3 ) {
             uj_arr__add( (uj_arr *) cur, newStr );
             goto AfterColon;
         }
@@ -841,11 +850,11 @@ StringX: SAFEGET(18)
        if( slashCnt ) newStr = (uj_node *) uj_str__new_from_json( strStart, strLen );
        else newStr = (uj_node *) uj_str__new( strStart, strLen, 2 );
          
-       if( cur->type == 1 ) {
+       if( cur->base.type == 1 ) {
            uj_hash__store( (uj_hash *) cur, keyStart, keyLen, newStr );
            goto AfterVal;
        }
-       if( cur->type == 3 ) {
+       if( cur->base.type == 3 ) {
            uj_arr__add( (uj_arr *) cur, newStr );
            goto AfterColon;
        }

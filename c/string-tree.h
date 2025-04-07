@@ -47,23 +47,36 @@ void xjr_key_arr__delete( xjr_key_arr *self );
 struct string_tree_s {
 	void *tree;
 };
+
+typedef struct StrWithHash_s {
+	uint32_t hash;
+	const char *str;
+	uint32_t len;
+} StrWithHash;
+
 typedef struct string_tree_s string_tree;
 snode *string_tree__rawget_len( string_tree *self, const char *key, unsigned keylen );
+snode *string_tree__rawget_precalc( string_tree *self, StrWithHash pre );
 string_tree *string_tree__new(void);
 void string_tree__delete( string_tree *self );
 void *string_tree__get_len( string_tree *self, const char *key, unsigned keylen, char *dataType );
+void *string_tree__get_precalc( string_tree *self, StrWithHash pre, char *dataType );
 void string_tree__delkey_len( string_tree *self, const char *key, unsigned keylen );
 
 void string_tree__store_len( string_tree *self, const char *key, unsigned keylen, void *node, char dataType );
+void string_tree__store_precalc( string_tree *self, StrWithHash pre, void *node, char dataType );
 
 void IntDest(void *); int IntComp(const void *,const void *);
 void IntPrint(const void* a); void InfoPrint(void *); void InfoDest(void *);
 
 xjr_key_arr *string_tree__getkeys( string_tree *self );
+unsigned string_tree__getkeycount( string_tree *self );
 void string_tree__getkeys_rec( void *snodeV, void *arrV );
 
 // Key Cache
 const char *keycache__store( const char *key, unsigned keylen );
 void keycache__delete(void);
+
+
 
 #endif

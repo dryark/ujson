@@ -32,7 +32,8 @@
      float     -> f
      double    -> d
      BOOL      -> B
-     long long -> l
+     long      -> l
+     long long -> q
      */
     char *str;
     if( numType[0] == 'c' ) { // signed char
@@ -156,7 +157,7 @@
 + (id)node2ns:(uj_node *)node {
     // need to check the jnode type to determine what to return
     // if it is a hash, wrap it in a new NodeHash
-    int type = node->type;
+    int type = node->base.type;
     if( type == 1 ) return [[UJHash alloc] initWithNode:(uj_hash *)node];
     // if it is a str, wrap it in a new NSString
     if( type == 2 ) { // string
@@ -172,7 +173,7 @@
         uj_node *cur = arrc->head;
         for( int i=0;i<arrc->count; i++) {
             [arr addObject:[self node2ns:cur]];
-            cur = cur->parent;
+            cur = cur->base.parent;
         }
         return arr;
     }
@@ -243,8 +244,7 @@
 }
 
 - (NSUInteger)count {
-    // todo
-    return 0;
+    return string_tree__getkeycount( _ujhash->tree );
 }
 
 - (NSEnumerator *)keyEnumerator {
