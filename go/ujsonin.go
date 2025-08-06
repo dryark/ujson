@@ -23,7 +23,9 @@ const (
 
 type JNode interface {
     Parent() ( JNode, uint8 )
+    SetParent( node JNode )
     Type() uint8
+    Del( key string )
     Get( key string ) JNode
     GetAt( pos int ) JNode
     GetArr() []JNode
@@ -51,7 +53,7 @@ type JHash struct {
     parent   JNode
     NodeType uint8
     hash map [ string ] JNode
-    count    uint8
+    //Count    uint8
 }
 
 type JArr struct {
@@ -62,7 +64,7 @@ type JArr struct {
 
 type JVal struct {
     NodeType uint8
-    str string
+    Str string
 }
 
 func ( self *JHash ) Parent() (JNode,uint8) {
@@ -75,6 +77,10 @@ func ( self *JArr ) Parent() (JNode,uint8) {
 }
 func ( self *JVal ) Parent() (JNode,uint8) { return nil, 0 }
 
+func ( self *JHash ) SetParent( node JNode ) { self.parent = node }
+func ( self *JArr ) SetParent( node JNode ) { self.parent = node }
+func ( self *JVal ) SetParent( node JNode ) {}
+
 func ( self *JHash ) Type() (uint8) { return self.NodeType }
 func ( self *JArr ) Type() (uint8) { return self.NodeType }
 func ( self *JVal ) Type() (uint8) { return self.NodeType }
@@ -84,6 +90,23 @@ func (self *JVal) GetAt( _ int ) JNode { return nil }
 
 func ( self *JArr ) GetAt( pos int ) JNode {
     return self.arr[ pos ]
+}
+
+func ( self *JArr ) Del( _ string ) { return }
+func ( self *JVal ) Del( _ string ) { return }
+
+func ( self *JHash ) Del( key string ) {
+    if strings.Contains(key,".") {
+        parts := strings.Split(key,".")
+        cur := JNode( self )
+        numParts := len( parts )
+        for i, part := range parts {
+            cur = cur.Get( part )
+            if i == ( numParts - 1 ) { break }
+        }
+        cur.Del( parts[ numParts - 1 ] )
+    }
+    delete( self.hash, key )
 }
 
 func ( self *JArr ) Get( _ string ) (JNode) { return nil }
@@ -167,18 +190,18 @@ func ( self *JArr ) Float32() (float32) { return 0 }
 
 func ( self JVal ) String() (string) {
     if( self.NodeType == TYPE_NEG ) {
-        return "-" + self.str
+        return "-" + self.Str
     }
     
-    return self.str
+    return self.Str
 }
 
 func ( self JVal ) StringEscaped() (string) {
     if( self.NodeType == TYPE_NEG ) {
-        return "-" + self.str
+        return "-" + self.Str
     }
     
-    str := []rune(self.str)
+    str := []rune(self.Str)
     escaped := ""
     for i:=0; i<len(str); i++ {
         let := str[i]
@@ -212,11 +235,11 @@ func ( self JVal ) Bool() (bool) {
 
 func ( self *JVal ) Int() (int) {
     if( self.NodeType == TYPE_POS ) {
-        i , _ := strconv.Atoi( self.str )
+        i , _ := strconv.Atoi( self.Str )
         return i;
     }
     if( self.NodeType == TYPE_NEG ) {
-        i , _ := strconv.Atoi( self.str )
+        i , _ := strconv.Atoi( self.Str )
         return -i
     }
     if( self.NodeType == TYPE_TRUE ) {
@@ -225,25 +248,25 @@ func ( self *JVal ) Int() (int) {
     if( self.NodeType == TYPE_FALSE ) {
         return 0
     }
-    i , _ := strconv.Atoi( self.str )
+    i , _ := strconv.Atoi( self.Str )
     return i
 }
 
 func ( self *JVal ) Float32() (float32) {
     if( self.NodeType == TYPE_FLOAT_POS ) {
-        i , _ := strconv.ParseFloat( self.str, 32 )
+        i , _ := strconv.ParseFloat( self.Str, 32 )
         return float32( i );
     }
     if( self.NodeType == TYPE_FLOAT_NEG ) {
-        i , _ := strconv.ParseFloat( self.str, 32 )
+        i , _ := strconv.ParseFloat( self.Str, 32 )
         return -float32( i )
     }
     if( self.NodeType == TYPE_POS ) {
-        i , _ := strconv.Atoi( self.str )
+        i , _ := strconv.Atoi( self.Str )
         return float32( i );
     }
     if( self.NodeType == TYPE_NEG ) {
-        i , _ := strconv.Atoi( self.str )
+        i , _ := strconv.Atoi( self.Str )
         return -float32( i )
     }
     if( self.NodeType == TYPE_TRUE ) {
@@ -252,7 +275,7 @@ func ( self *JVal ) Float32() (float32) {
     if( self.NodeType == TYPE_FALSE ) {
         return 0
     }
-    i , _ := strconv.Atoi( self.str )
+    i , _ := strconv.Atoi( self.Str )
     return float32( i )
 }
 
@@ -334,7 +357,7 @@ func (self *JHash) DumpInternalSave( depth int, json bool ) string {
         }
         basicKey := true
         l := key[0]
-        if ( ( l < 'a' && l > 'z' ) || ( l < 'A' && l > 'Z' ) ) {
+        if ( ( l < 'a' && l > 'z' ) || ( l < 'A' && l > 'Z' ) || ( l == '_' ) ) {
             basicKey = false
         } else {
             for i := 1; i < len(key); i++ {
@@ -405,7 +428,7 @@ func ( self *JArr ) DumpInternalSave( depth int, json bool ) string {
     i := 0
     maxi := len( self.arr ) - 1
     for _, el := range self.arr {
-        fmt.Printf( strings.Repeat("  ",depth) )
+        out += fmt.Sprintf( strings.Repeat("  ",depth) )
         out += el.DumpInternalSave( depth, json )
         if i != maxi {
             if json {
@@ -441,12 +464,12 @@ func ( self *JVal  ) JsonSave() string { return self.DumpInternalSave( 1, true )
 func ( self *JVal ) DumpInternal( depth int, json bool ) {
     if self.NodeType == TYPE_STR {
         //out := strings.ReplaceAll( self.str, "\\", "\\\\" )
-        out := strings.ReplaceAll( self.str, "\"", "\\\"" )
+        out := strings.ReplaceAll( self.Str, "\"", "\\\"" )
         fmt.Printf("\"%s\"", out )
     } else if self.NodeType == TYPE_POS { // positive number
-        fmt.Printf("%s", self.str )
+        fmt.Printf("%s", self.Str )
     } else if self.NodeType == TYPE_NEG { // negative number
-        fmt.Printf("-%s", self.str )
+        fmt.Printf("-%s", self.Str )
     } else if self.NodeType == TYPE_TRUE {
         fmt.Printf("true")
     } else if self.NodeType == TYPE_FALSE {
@@ -459,12 +482,12 @@ func ( self *JVal ) DumpInternal( depth int, json bool ) {
 func ( self *JVal ) DumpInternalSave( depth int, json bool ) string {
     if self.NodeType == TYPE_STR {
         //out := strings.ReplaceAll( self.str, "\\", "\\\\" )
-        out := strings.ReplaceAll( self.str, "\"", "\\\"" )
+        out := strings.ReplaceAll( self.Str, "\"", "\\\"" )
         return fmt.Sprintf("\"%s\"", out )
     } else if self.NodeType == TYPE_POS { // positive number
-        return self.str
+        return self.Str
     } else if self.NodeType == TYPE_NEG { // negative number
-        return fmt.Sprintf("-%s", self.str )
+        return fmt.Sprintf("-%s", self.Str )
     } else if self.NodeType == TYPE_TRUE {
         return fmt.Sprintf("true")
     } else if self.NodeType == TYPE_FALSE {
@@ -502,7 +525,7 @@ func NewBool( val bool ) JNode {
 }
 
 func NewString( str string ) JNode {
-    return &JVal{ NodeType: TYPE_STR, str: str }
+    return &JVal{ NodeType: TYPE_STR, Str: str }
 }
 
 func init() {
@@ -517,14 +540,35 @@ type ParseError struct {
 }
 
 func Parse( data []byte ) ( JNode, []byte ) {
-    root, remainder, err := ParseFull( data )
+    root, remainder, err := ParseFull( data, nil )
     if err != nil {
         panic( err.text )
     }
     return root, remainder
 }
 
-func ParseFull( data []byte ) ( JNode, []byte, *ParseError ) {
+type ParseOpts struct {
+    OnRootChunk func( JNode )
+}
+
+func GetPosInfo( data []byte, pos int ) (int,int){
+    //size := len( data )
+    
+    line := 1
+    x := 0
+    for i:=0;i<pos;i++ {
+        char := data[i]
+        if char == '\n' {
+            line++
+            x = 0
+            continue
+        }
+        x++
+    }
+    return line,x
+}
+
+func ParseFull( data []byte, opts *ParseOpts ) ( JNode, []byte, *ParseError ) {
     // This error catching exists to avoid having to check data bounds
     //   every place as the data is iterated through. Instead of checking
     //   the bounds I rely on Go to panic when it occurs and then catch
@@ -552,6 +596,8 @@ func ParseFull( data []byte ) ( JNode, []byte, *ParseError ) {
     size := len( data )
     endi := size - 1
     if Debug { fmt.Printf("Start of Parse; len=%d\n", size ) }
+    if opts == nil { opts = &ParseOpts{} }
+    onRootChunk := opts.OnRootChunk
     
     pos := 0
     keyStart := 0
@@ -564,6 +610,8 @@ func ParseFull( data []byte ) ( JNode, []byte, *ParseError ) {
     str := ""
     finalState := ""
     substrStart := 0
+    y := 0
+    x := 0
     
     nodeType := uint8( 0 )
     //cur = NewJHash( nil )
@@ -601,7 +649,7 @@ UnknownRoot:
         nodeType = TYPE_HASH
         goto QKeyName1
     }
-    if let >= 'a' && let <= 'z' || let >= 'A' && let <= 'Z' {
+    if let >= 'a' && let <= 'z' || let >= 'A' && let <= 'Z' || let == '_' {
         pos--
         cur = NewJHash( nil )
         root = cur
@@ -633,7 +681,7 @@ Hash:
         endc = '"'
         goto QKeyName1
     }
-    if let >= 'a' && let <= 'z' || let >= 'A' && let <= 'Z' {
+    if let >= 'a' && let <= 'z' || let >= 'A' && let <= 'Z' || let == '_' {
         pos--
         goto KeyName1
     }
@@ -644,6 +692,9 @@ Hash:
             cur = parent
             nodeType = parentType
             goto HashOrAfterColon
+        } else if onRootChunk != nil {
+             onRootChunk( cur )
+             goto UnknownRoot
         }
         remainder = data[pos:]
         goto Done
@@ -841,7 +892,7 @@ NumberX:
     if let == '.' { goto AfterDot; }
     if let < '0' || let > '9' {
         str := string( data[ strStart : pos - 1 ] )
-        newJNode := JVal{ str: str }
+        newJNode := JVal{ Str: str }
         if neg {
             newJNode.NodeType = TYPE_NEG
         } else {
@@ -858,7 +909,7 @@ AfterDot:
     pos++
     if let < '0' || let > '9' {
         str := string( data[ strStart : pos - 1 ] )
-        newJNode := JVal{ str: str }
+        newJNode := JVal{ Str: str }
         if neg {
             newJNode.NodeType = TYPE_FLOAT_NEG
         } else {
@@ -877,7 +928,7 @@ String1:
     substrStart = pos
     pos++
     if let == endc {
-        newJNode := JVal{ NodeType: TYPE_STR, str: str } 
+        newJNode := JVal{ NodeType: TYPE_STR, Str: str } 
         cur.Add( key, &newJNode )
         goto HashOrAfterColon
     }
@@ -893,7 +944,7 @@ StringX:
     if let == endc {
         //str := string( data[ strStart : pos - 1 ] )
         str = str + string( data[ substrStart : pos - 1 ] )
-        newJNode := &JVal{ NodeType: TYPE_STR, str: str }
+        newJNode := &JVal{ NodeType: TYPE_STR, Str: str }
         cur.Add( key, newJNode )
         goto HashOrAfterColon
     }
@@ -929,7 +980,35 @@ HashOrAfterColon:
     // who cares about commas in between things; we can just ignore them :D
     //goto Hash
 OverEnd:
-    return root, remainder, &ParseError{ text:"JSON Incomplete", state:finalState }
+    y,x = GetPosInfo( data, pos )
+    return root, remainder, &ParseError{
+        text:fmt.Sprintf("JSON Incomplete. Line %d. X %d.", y, x ),
+        state:finalState,
+    }
 Done:
     return root, remainder, err
+}
+
+func SetStr( node JNode, key string, str string ) {
+    node.Add( key, NewString( str ) )
+}
+
+func SetBool( node JNode, key string, val bool ) {
+    node.Add( key, NewBool( val ) )
+}
+
+func SetNum( parent JNode, key string, num int ) {
+    var node *JVal
+    if num >= 0 {
+        node = &JVal{
+            NodeType: TYPE_POS,
+            Str: fmt.Sprintf( "%d", num ),
+        }
+    } else {
+        node = &JVal{
+            NodeType: TYPE_NEG,
+            Str: fmt.Sprintf( "%d", -num ),
+        }
+    }
+    parent.Add( key, node )
 }
